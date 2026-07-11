@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════
-//  MODULE: AutoAttack - Apenas Dodge (Herald SO V49.2)
-//  Sistema de Defesa Dodge com agrupamento de ataques
+//  MODULE: AutoAttack - Dodge Original (Herald SO V49.2)
+//  Sistema de Defesa Dodge - EXATAMENTE como no script original
 //  Painel integrado na aba "Attack" do MultBot
 // ══════════════════════════════════════════════════════
 
@@ -9,7 +9,7 @@ var AutoAttack = class extends MultUtil {
         super(c, s);
         this._active = false;
 
-        // ═══ CONFIGURAÇÃO DO DODGE ═══
+        // ═══ CONFIGURAÇÃO DO DODGE (IGUAL AO ORIGINAL) ═══
         this.CIDADES = {
             2677: 2470,
             154: 156,
@@ -63,7 +63,7 @@ var AutoAttack = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🛠️ FUNÇÕES AUXILIARES DO DODGE
+    // 🛠️ FUNÇÕES AUXILIARES (adaptadas para uw)
     // ═══════════════════════════════════════════════════════════════════════
 
     _gameNow() {
@@ -97,7 +97,7 @@ var AutoAttack = class extends MultUtil {
         if (!this.CONFIG.DEBUG && type === 'debug') return;
         const icons = { info: '📘', success: '✅', warning: '⚠️', error: '❌', debug: '🔍', attack: '⚔️', dodge: '🛡️', naval: '🚢', ground: '⚔️', group: '📦' };
         const icon = icons[type] || '📘';
-        this.console.log(`[HERALD] ${icon} [${new Date().toLocaleTimeString()}] ${message}`);
+        console.log(`[HERALD] ${icon} [${new Date().toLocaleTimeString()}] ${message}`);
     }
 
     _playSound(type = 'warning') {
@@ -186,7 +186,7 @@ var AutoAttack = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📤 ENVIAR SUPORTE
+    // 📤 ENVIAR SUPORTE (USANDO XMLHttpRequest - IGUAL AO ORIGINAL)
     // ═══════════════════════════════════════════════════════════════════════
 
     _sendSupportForGroup(fromTownId, targetTownId, firstTime, lastTime, groupKey, attackType) {
@@ -198,8 +198,9 @@ var AutoAttack = class extends MultUtil {
         }
 
         var typeLabel = attackType === 'naval' ? '🚢 NAVAL' : attackType === 'ground' ? '⚔️ TERRESTRE' : '🔄 MISTO';
+        var Game = this._getGame();
 
-        if (!uw.Game || !uw.Game.csrfToken) {
+        if (!Game || !Game.csrfToken) {
             this._log(`❌ Game não disponível para ${typeLabel}`, 'error');
             return;
         }
@@ -220,9 +221,6 @@ var AutoAttack = class extends MultUtil {
             }
         }
 
-        this._log(`🪖 Enviando ${limitedTotal} ${typeLabel} tropas de ${fromTownId} para ${targetTownId}`, 'info');
-        this._log(`⏱️ Voltar ${this.CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS o último ataque`, 'info');
-
         var departTime = Math.ceil(this._gameNow()) + 1;
         var payload = {
             id: Number(targetTownId),
@@ -238,27 +236,35 @@ var AutoAttack = class extends MultUtil {
             }
         }
 
+        var url = '/game/town_info?action=send_units&h=' + Game.csrfToken;
         var commandId = null;
-        var self = this;
 
-        this._withTownId(fromTownId, async function() {
-            try {
-                const result = await self.ajaxPostWithTimeout('town_info', 'send_units', payload, 15000);
-                self._log(`✅ SUPORTE ${typeLabel} ENVIADO com sucesso!`, 'success');
-                self._playSound('success');
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url, false);
+        xhr.withCredentials = true;
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
-                self.troopsSent[timerKey] = true;
+        try {
+            xhr.send('json=' + encodeURIComponent(JSON.stringify(payload)));
+
+            if (xhr.responseText.indexOf('sucesso') !== -1 || xhr.responseText.indexOf('success') !== -1) {
+                this._log(`✅ SUPORTE ${typeLabel} ENVIADO com sucesso!`, 'success');
+                this._playSound('success');
+
+                this.troopsSent[timerKey] = true;
 
                 try {
-                    if (result && result.notifications) {
-                        for (var i = 0; i < result.notifications.length; i++) {
-                            var notif = result.notifications[i];
+                    var response = JSON.parse(xhr.responseText);
+                    if (response && response.json && response.json.notifications) {
+                        for (var i = 0; i < response.json.notifications.length; i++) {
+                            var notif = response.json.notifications[i];
                             if (notif && notif.param_str) {
                                 try {
                                     var data = JSON.parse(notif.param_str);
                                     if (data && data.MovementsUnits && data.MovementsUnits.command_id) {
                                         commandId = data.MovementsUnits.command_id;
-                                        self._log(`📋 Command ID ${typeLabel}: ${commandId}`, 'debug');
+                                        this._log(`📋 Command ID ${typeLabel}: ${commandId}`, 'debug');
                                         break;
                                     }
                                 } catch(e) {}
@@ -269,34 +275,36 @@ var AutoAttack = class extends MultUtil {
 
                 if (commandId) {
                     var cmdKey = groupKey + '_' + attackType;
-                    self.attackCommands[cmdKey] = commandId;
+                    this.attackCommands[cmdKey] = commandId;
 
-                    var cancelDelay = (lastTime - self._gameNow() + self.CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000;
+                    var cancelDelay = (lastTime - this._gameNow() + this.CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000;
                     cancelDelay = Math.max(cancelDelay, 1000);
 
                     var timerKey2 = groupKey + '_' + attackType;
-                    if (self.dodgeState.returnTimers[timerKey2]) {
-                        clearTimeout(self.dodgeState.returnTimers[timerKey2]);
+                    if (this.dodgeState.returnTimers[timerKey2]) {
+                        clearTimeout(this.dodgeState.returnTimers[timerKey2]);
                     }
 
-                    self.dodgeState.returnTimers[timerKey2] = setTimeout(function() {
+                    var self = this;
+                    this.dodgeState.returnTimers[timerKey2] = setTimeout(function() {
                         self._cancelCommand(commandId, fromTownId, attackType, groupKey);
                         delete self.troopsSent[timerKey2];
                     }, cancelDelay);
 
-                    self._log(`⏱️ ${typeLabel} programado para voltar ${self.CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS`, 'info');
+                    this._log(`⏱️ ${typeLabel} programado para voltar ${this.CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS`, 'info');
                 } else {
-                    self._log(`⚠️ Não foi possível extrair command_id para ${typeLabel}`, 'warning');
+                    this._log(`⚠️ Não foi possível extrair command_id para ${typeLabel}`, 'warning');
                 }
 
-                return result;
-            } catch(e) {
-                self._log(`❌ Erro ${typeLabel}: ${e.message}`, 'error');
-                throw e;
+                return commandId;
+            } else {
+                this._log(`❌ Erro ${typeLabel}: ${xhr.responseText}`, 'error');
             }
-        });
+        } catch(e) {
+            this._log(`❌ Erro de rede ${typeLabel}: ${e}`, 'error');
+        }
 
-        return commandId;
+        return null;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -307,7 +315,8 @@ var AutoAttack = class extends MultUtil {
         var typeLabel = attackType === 'naval' ? '🚢 NAVAL' : attackType === 'ground' ? '⚔️ TERRESTRE' : '🔄 MISTO';
         this._log(`🚫 CANCELANDO ${typeLabel} comando #${commandId}`, 'dodge');
 
-        if (!uw.Game || !uw.Game.csrfToken) {
+        var Game = this._getGame();
+        if (!Game || !Game.csrfToken) {
             this._log(`❌ Game não disponível para ${typeLabel}`, 'error');
             return;
         }
@@ -321,11 +330,17 @@ var AutoAttack = class extends MultUtil {
             nl_init: true
         };
 
-        var self = this;
+        var url = '/game/frontend_bridge?action=execute&h=' + Game.csrfToken;
 
-        this._withTownId(townId, async function() {
-            try {
-                await self.ajaxPostWithTimeout('frontend_bridge', 'execute', payload, 15000);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.withCredentials = true;
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+        var self = this;
+        xhr.onload = function() {
+            if (xhr.responseText.indexOf('success') !== -1 || xhr.responseText.indexOf('ok') !== -1) {
                 self._log(`✅ TROPAS ${typeLabel} VOLTARAM!`, 'success');
                 self._playSound('success');
 
@@ -339,10 +354,16 @@ var AutoAttack = class extends MultUtil {
                     self.dodgeState.groupStatus[groupKey].status = 'cancelled';
                 }
                 self._updatePanel();
-            } catch(e) {
-                self._log(`❌ Erro ao cancelar ${typeLabel}: ${e.message}`, 'error');
+            } else {
+                self._log(`❌ Erro ao cancelar ${typeLabel}: ${xhr.responseText}`, 'error');
             }
-        });
+        };
+
+        xhr.onerror = function(e) {
+            self._log(`❌ Erro de rede ao cancelar ${typeLabel}: ${e}`, 'error');
+        };
+
+        xhr.send('json=' + encodeURIComponent(JSON.stringify(payload)));
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -559,7 +580,7 @@ var AutoAttack = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📋 UPDATE PANEL - EXATAMENTE IGUAL AO ORIGINAL
+    // 📋 UPDATE PANEL
     // ═══════════════════════════════════════════════════════════════════════
 
     _updatePanel() {
@@ -629,7 +650,6 @@ var AutoAttack = class extends MultUtil {
             }
         }
 
-        // Atualizar contador
         const counter = uw.$('#dodge_counter');
         if (counter.length) {
             counter.text(attackCount);
@@ -644,32 +664,13 @@ var AutoAttack = class extends MultUtil {
     }
 
     _startDodge() {
-        this._log('🛡️ Herald SO v49.2 - DENTRO DO MULTBOT!', 'info');
+        this._log('🚀 Herald SO v49.2 - DENTRO DO MULTBOT!', 'info');
         this._log('🏙️ Cidades: ' + Object.keys(this.CIDADES).join(', '), 'info');
 
         setTimeout(() => this._scanAttacks(), 2000);
         setInterval(() => this._scanAttacks(), this.CONFIG.INTERVALO_REFRESH_ATAQUES * 1000);
 
-        this._log('✅ Sistema Dodge ativo!', 'success');
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🛠️ MÉTODO AUXILIAR - withTownId
-    // ═══════════════════════════════════════════════════════════════════════
-
-    async _withTownId(townId, fn) {
-        const orig = uw.Game.townId;
-        const origStr = uw.Game.town_id;
-        uw.Game.townId = parseInt(townId, 10);
-        uw.Game.town_id = parseInt(townId, 10);
-
-        try {
-            const result = await fn();
-            return result;
-        } finally {
-            uw.Game.townId = orig;
-            uw.Game.town_id = origStr;
-        }
+        this._log('✅ Sistema ativo!', 'success');
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -692,7 +693,6 @@ var AutoAttack = class extends MultUtil {
 
         html += '<div style="padding:4px 10px;">';
 
-        // ═══ PAINEL DODGE ═══
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0;">';
         html += '<span style="font-weight:bold;font-size:11px;">🛡️ Ataques detectados: <span id="dodge_counter" style="color:#888;">0</span></span>';
         html += '<span style="font-size:9px;color:#666;">' + Object.keys(this.CIDADES).length + ' cidades protegidas</span>';
@@ -700,14 +700,12 @@ var AutoAttack = class extends MultUtil {
 
         html += '<div id="dodge_panel_container" style="font-size:11px;max-height:350px;overflow-y:auto;margin:4px 0;"></div>';
 
-        // ═══ BOTÕES ═══
         html += '<div style="display:flex;gap:4px;margin:4px 0;flex-wrap:wrap;">';
         html += this.getButtonHtml('dodge_refresh', '🔄 Atualizar', this._dodgeRefresh);
         html += this.getButtonHtml('dodge_clear', '🗑️ Limpar', this._dodgeClear);
         html += this.getButtonHtml('dodge_test', '🧪 Testar', this._dodgeTest);
         html += '</div>';
 
-        // ═══ ADICIONAR CIDADES ═══
         html += '<div style="display:flex;gap:4px;margin:4px 0;flex-wrap:wrap;align-items:center;font-size:10px;">';
         html += '<label style="font-size:10px;">Atacada:</label>';
         html += '<select id="dodge_attack_cidade" style="padding:2px;font-size:10px;width:100px;">';
@@ -720,7 +718,6 @@ var AutoAttack = class extends MultUtil {
         html += this.getButtonHtml('dodge_add_btn', '+ Add', this._dodgeAddCidade);
         html += '</div>';
 
-        // ═══ FOOTER ═══
         html += '<div style="font-size:9px;color:#666;margin:4px 0;text-align:center;">';
         html += '⭐ Menos de ' + this.CONFIG.JANELA_GRUPO + 's = GRUPO | ' + this.CONFIG.TEMPO_ANTECEDENCIA + 's ANTES | ' + this.CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS';
         html += '</div>';
@@ -871,17 +868,9 @@ var AutoAttack = class extends MultUtil {
         this._updatePanel();
     };
 
-    // ═══ MÉTODOS VAZIOS (para compatibilidade) ═══
+    // ═══ MÉTODOS VAZIOS ═══
 
-    toggle = () => {
-        // Não faz nada - apenas para compatibilidade
-    };
-
-    start = () => {
-        // Não faz nada - o Dodge já está ativo
-    };
-
-    stop = () => {
-        // Não faz nada
-    };
+    toggle = () => {};
+    start = () => {};
+    stop = () => {};
 };

@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════
 //  MODULE: AutoDodge - Configuração Manual no Script
-//  CORRIGIDO: Agora aparece na aba "Attack" do MultBot
+//  CORRIGIDO: Agora aparece na aba "Attack" (não Mix)
 // ══════════════════════════════════════════════════════
 var AutoDodge = class extends MultUtil {
     constructor(c, s) {
@@ -55,20 +55,20 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🔑 REGISTRO DO MÓDULO - ESSENCIAL PARA APARECER NA ABA ATTACK
+    // 🔑 PROPRIEDADES PARA O MULTBOT - CATEGORIA ATTACK
     // ═══════════════════════════════════════════════════════════════════════
-
-    // Nome do módulo que vai aparecer na lista
+    
+    // Nome que aparece na lista de módulos
     static get moduleName() {
         return '🛡️ Dodge Automático';
     }
 
-    // Categoria onde o módulo vai aparecer (Attack, Defense, etc)
+    // ⭐ CATEGORIA: "Attack" (NÃO "Mix"!)
     static get category() {
-        return 'Attack';
+        return 'Attack';  // ← TEM QUE SER "Attack" com A maiúsculo
     }
 
-    // Prioridade na lista (opcional)
+    // Prioridade na lista
     static get priority() {
         return 10;
     }
@@ -80,7 +80,6 @@ var AutoDodge = class extends MultUtil {
     settings = () => {
         requestAnimationFrame(() => this._updateTitle());
         
-        // Lista de cidades configuradas
         let cidadesList = '';
         for (const [from, to] of Object.entries(this.CIDADES)) {
             cidadesList += `<div style="padding:2px 0;font-size:11px;color:#aaa;">🏙️ ${from} → ${to}</div>`;
@@ -116,7 +115,7 @@ var AutoDodge = class extends MultUtil {
                 <div style="padding:5px 10px;max-height:150px;overflow-y:auto;">
                     ${cidadesList}
                     <div style="color:#666;font-size:10px;margin-top:5px;border-top:1px solid #333;padding-top:5px;">
-                        📝 Edite as cidades no código do módulo
+                        📝 Edite as cidades no código do módulo (linha 24)
                     </div>
                 </div>
                 
@@ -798,3 +797,31 @@ var AutoDodge = class extends MultUtil {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 };
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🔑 REGISTRO DO MÓDULO NO MULTBOT - CATEGORIA ATTACK
+// ═══════════════════════════════════════════════════════════════════════
+
+// Registrar no uw.Modules com categoria ATTACK
+if (typeof uw !== 'undefined' && uw.Modules) {
+    uw.Modules.AutoDodge = AutoDodge;
+    // Forçar categoria Attack se possível
+    if (uw.Modules._categories) {
+        uw.Modules._categories.AutoDodge = 'Attack';
+    }
+    console.log('[AutoDodge] ✅ Módulo registrado em uw.Modules (Attack)');
+}
+
+// Registrar no window
+if (typeof window !== 'undefined') {
+    window.AutoDodge = AutoDodge;
+}
+
+// Tentar registrar diretamente no MultBot
+if (typeof MultBot !== 'undefined' && MultBot.registerModule) {
+    MultBot.registerModule('AutoDodge', AutoDodge, 'Attack');
+    console.log('[AutoDodge] ✅ Módulo registrado no MultBot (Attack)');
+}
+
+console.log('[AutoDodge] 🚀 Módulo carregado - Categoria: Attack');
+console.log('[AutoDodge] 📦 Cidades: ' + Object.keys(AutoDodge.prototype.CIDADES || {}).length);

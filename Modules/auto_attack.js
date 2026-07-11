@@ -13,9 +13,12 @@ var AutoAttack = class extends MultUtil {
     // ═══ CONFIGURAÇÃO DO DODGE - COLOQUE AQUI SUAS CIDADES ═══
     DODGE_CIDADES = {
         2677: 2470,  // Cidade atacada: Cidade que envia suporte
+        154: 156,
         2195: 2280,
         197: 234,
         2165: 288,
+        97: 13,
+        2263: 2273,
         // Adicione mais cidades aqui no formato: atacada: suporte
     };
 

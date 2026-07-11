@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════
 //  MODULE: StatusPanel
 //  Painel de status em tempo real de todos os módulos
-//  Design elegante com tabela e linhas azuis
+//  Apenas letras a preto
 // ══════════════════════════════════════════════════════
 
 var StatusPanel = class extends MultUtil {
@@ -137,7 +137,6 @@ var StatusPanel = class extends MultUtil {
             rows.push(this._row('🔥', 'Sacrifício de Ares', aresActive, aresActive ? 'Ativo' : 'Parado', 'autoAresSacrifice', 'toggle'));
             rows.push(this._row('📚', 'Auto Pesquisa', researchActive, researchActive ? 'Ativo' : 'Parado', 'autoResearch', 'toggle'));
 
-            // Montar tabela com linhas azuis
             let html = `
             <table style="width:100%;border-collapse:collapse;font-size:12px;border-radius:8px;overflow:hidden;">
                 <thead>
@@ -163,32 +162,31 @@ var StatusPanel = class extends MultUtil {
             ? `window.multBot.${module}.${method}()`
             : null;
 
-        const statusColor = active ? '#00b894' : '#636e72';
+        const statusColor = active ? '#000000' : '#000000';
         const statusDot = active ? '🟢' : '⚪';
         const statusText = active ? 'Ativo' : 'Parado';
 
-        // Cores das linhas alternadas
         const bgColor = active ? 'rgba(0,184,148,0.04)' : 'rgba(255,255,255,0.01)';
         const borderColor = active ? 'rgba(0,184,148,0.2)' : 'rgba(255,255,255,0.04)';
 
         const btn = onclick
             ? `<div class="button_new ${active ? '' : 'disabled'}" onclick="${onclick}" style="cursor:pointer;margin:0;padding:2px 10px;min-height:24px;display:inline-block;">
                 <div class="left"></div><div class="right"></div>
-                <div class="caption js-caption" style="font-size:10px;padding:0 8px;color:#dfe6e9;">${active ? '🟢' : '⚪'}<div class="effect js-effect"></div></div>
+                <div class="caption js-caption" style="font-size:10px;padding:0 8px;color:#000000;">${active ? '🟢' : '⚪'}<div class="effect js-effect"></div></div>
                </div>`
-            : `<span style="font-size:11px;color:#636e72;">—</span>`;
+            : `<span style="font-size:11px;color:#000000;">—</span>`;
 
         return `
         <tr style="border-bottom:1px solid ${borderColor};background:${bgColor};transition:all 0.3s ease;">
-            <td style="padding:8px 14px;color:#dfe6e9;display:flex;align-items:center;gap:10px;">
+            <td style="padding:8px 14px;color:#000000;display:flex;align-items:center;gap:10px;">
                 <span style="font-size:18px;opacity:0.7;">${icon}</span>
-                <span style="font-weight:500;font-size:12px;">${label}</span>
+                <span style="font-weight:500;font-size:12px;color:#000000;">${label}</span>
             </td>
             <td style="padding:8px 14px;">
-                <span style="color:${statusColor};font-weight:${active ? '600' : '300'};font-size:12px;">
+                <span style="color:#000000;font-weight:${active ? '600' : '300'};font-size:12px;">
                     ${statusDot} ${statusText}
                 </span>
-                <span style="color:#636e72;font-size:10px;margin-left:8px;">${value}</span>
+                <span style="color:#000000;font-size:10px;margin-left:8px;">${value}</span>
             </td>
             <td style="padding:8px 14px;text-align:right;">
                 ${btn}

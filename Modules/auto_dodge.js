@@ -24,10 +24,12 @@
 //     MultUtil), eliminando a duplicacao dessa logica.
 //  5) RETORNO PRECISO: verificacao a cada 100ms em vez de setTimeout
 //     unico - elimina atrasos de 20+ segundos.
+//  6) BUSCA ARRIVAL ATUALIZADO: o script agora busca o arrival_at
+//     mais recente do jogo a cada 100ms, garantindo precisao.
 // ══════════════════════════════════════════════════════
 var AutoDodge = class extends MultUtil {
     EVACUATE_LEAD_SECONDS = 15;
-    RECALL_BUFFER_SECONDS = 2; // MUDADO: agora so 2 segundos de margem (era 20)
+    RECALL_BUFFER_SECONDS = 1; // MUDADO: 1 segundo depois do ataque (pode alterar para 0, 1, 2, etc)
     CAPTURE_DELAY_MS = 2500;
     ISLAND_SCRAPE_DELAY_MS = 400;
     RECALL_CHECK_INTERVAL_MS = 100; // NOVO: verifica a cada 100ms
@@ -436,7 +438,7 @@ var AutoDodge = class extends MultUtil {
             if (commandId) {
                 this.console.log('[AutoDodge] ' + townName + ' (' + label + '): commandId encontrado: #' + commandId);
                 excludeIds.add(String(commandId));
-                this._scheduleRecall(fromTownId, townName, attackArrival, commandId, label);
+                this._scheduleRecall(fromTownId, townName, commandId, label);
             } else {
                 this.console.log('[AutoDodge] Aviso: ' + townName + ' (' + label + ') - id do comando nao encontrado. Recall manual necessario.');
                 uw.$('#dodge_log').text('Aviso: ' + townName + ' (' + label + ') - recall automatico indisponivel.').css('color', '#eab308');
@@ -473,33 +475,28 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🆕 NOVO: AGENDAMENTO PRECISO DE RETORNO COM VERIFICAÇÃO A CADA 100ms
+    // 🆕 NOVO: AGENDAMENTO PRECISO DE RETORNO COM ARRIVAL ATUALIZADO
     // ═══════════════════════════════════════════════════════════════════════
 
-    _scheduleRecall(townId, townName, attackArrival, commandId, label) {
-        const now = Math.floor(Date.now() / 1000);
-        const rawSec = (attackArrival - now) + this.RECALL_BUFFER_SECONDS;
-        const fireInSec = rawSec > this.RECALL_BUFFER_SECONDS ? rawSec : this.RECALL_BUFFER_SECONDS;
-        const dueAt = Date.now() + (fireInSec * 1000);
+    _scheduleRecall(townId, townName, commandId, label) {
         const recallKey = townId + ':' + label;
 
-        this.console.log('[AutoDodge] ' + townName + ' (' + label + '): retorno agendado para daqui a ' + fireInSec + 's (comando #' + commandId + ').');
+        this.console.log('[AutoDodge] ' + townName + ' (' + label + '): retorno agendado (comando #' + commandId + ').');
 
-        // Persiste no storage
+        // Persiste no storage (sem guardar arrival fixo - vai buscar atualizado)
         this._savePendingRecall(recallKey, { 
             townId: townId, 
             townName: townName, 
             commandId: commandId, 
-            label: label, 
-            dueAt: dueAt,
-            attackArrival: attackArrival
+            label: label,
+            // NÃO guarda attackArrival - vai buscar atualizado
         });
 
-        // ═══ NOVO: VERIFICAÇÃO PRECISA A CADA 100ms ═══
-        this._startPreciseRecallCheck(recallKey, townId, townName, commandId, label, attackArrival);
+        // ═══ VERIFICAÇÃO PRECISA COM ARRIVAL ATUALIZADO ═══
+        this._startPreciseRecallCheckWithUpdate(recallKey, townId, townName, commandId, label);
     }
 
-    _startPreciseRecallCheck(recallKey, townId, townName, commandId, label, attackArrival) {
+    _startPreciseRecallCheckWithUpdate(recallKey, townId, townName, commandId, label) {
         var self = this;
         
         function checkRecall() {
@@ -509,12 +506,38 @@ var AutoDodge = class extends MultUtil {
                     return;
                 }
 
+                // ═══ BUSCA O ARRIVAL ATUALIZADO ═══
+                var updatedArrival = self._getUpdatedAttackArrival(townId);
+                
+                // Se não houver mais ataques para esta cidade
+                if (!updatedArrival) {
+                    var hasAttacks = self._hasIncomingAttacks(townId);
+                    if (!hasAttacks) {
+                        self.console.log('[AutoDodge] ⚠️ ' + townName + ' (' + label + '): Ataque cancelado! Tropas em apoio.');
+                        // Remove o recall pendente
+                        self._removePendingRecall(recallKey);
+                        self._pendingRecalls.delete(recallKey);
+                        return;
+                    }
+                    // Se há ataques mas não conseguimos buscar o arrival, esperamos mais
+                    var timeoutId = setTimeout(checkRecall, self.RECALL_CHECK_INTERVAL_MS);
+                    self._pendingRecalls.set(recallKey, { 
+                        timeoutId: timeoutId, 
+                        commandId: commandId,
+                        checkInterval: true
+                    });
+                    return;
+                }
+
                 var now = self._gameNow();
-                var targetTime = attackArrival + self.RECALL_BUFFER_SECONDS;
+                var targetTime = updatedArrival + self.RECALL_BUFFER_SECONDS;
+                
+                // Log de debug (opcional - podes comentar se não quiseres)
+                // self.console.log('[AutoDodge] 🔄 ' + townName + ' (' + label + '): Arrival=' + updatedArrival + ', target=' + targetTime + ', agora=' + now);
                 
                 // Se já passou do tempo alvo, cancela
                 if (now >= targetTime) {
-                    self.console.log('[AutoDodge] ⏱️ ' + townName + ' (' + label + '): Atingiu o tempo alvo (' + now + ' >= ' + targetTime + ')');
+                    self.console.log('[AutoDodge] ⏱️ ' + townName + ' (' + label + '): Atingiu o tempo alvo! Cancelando...');
                     
                     // Remove do storage
                     self._removePendingRecall(recallKey);
@@ -551,30 +574,83 @@ var AutoDodge = class extends MultUtil {
             }
         }
         
-        // Inicia a primeira verificação (após um pequeno atraso)
-        var now = this._gameNow();
-        var timeUntilTarget = (attackArrival + this.RECALL_BUFFER_SECONDS) - now;
-        
-        // Se já passou do tempo alvo, cancela imediatamente
-        if (timeUntilTarget <= 0) {
-            this.console.log('[AutoDodge] ⏱️ ' + townName + ' (' + label + '): Já passou do tempo alvo, cancelando imediatamente');
-            this._recallSupport(townId, townName, commandId, label);
-            this._removePendingRecall(recallKey);
-            this._pendingRecalls.delete(recallKey);
-            return;
-        }
-        
-        // Calcula o atraso inicial (máximo 2 segundos para não sobrecarregar)
-        var initialDelay = Math.min(timeUntilTarget * 1000, 2000);
-        
-        this.console.log('[AutoDodge] ⏱️ ' + townName + ' (' + label + '): Verificação agendada em ' + Math.round(initialDelay) + 'ms');
-        
-        var timeoutId = setTimeout(checkRecall, initialDelay);
+        // Inicia a primeira verificação com um pequeno atraso
+        var timeoutId = setTimeout(checkRecall, 500);
         this._pendingRecalls.set(recallKey, { 
             timeoutId: timeoutId, 
             commandId: commandId,
             checkInterval: true
         });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🆕 BUSCA O ARRIVAL ATUALIZADO DO ATAQUE MAIS RECENTE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _getUpdatedAttackArrival(townId) {
+        try {
+            const models = uw.MM.getModels().MovementsUnits;
+            if (!models) return null;
+            
+            let latestArrival = null;
+            
+            for (const key in models) {
+                const mv = models[key].attributes;
+                if (!mv) continue;
+                
+                // Verifica se é um ataque e se a cidade alvo é a nossa
+                const isAttack = mv.type === 'attack' || mv.type === 'attack_with_spy';
+                if (!isAttack) continue;
+                
+                if (String(mv.target_town_id) !== String(townId)) continue;
+                
+                const arrival = mv.arrival_at ? mv.arrival_at : (mv.time_of_arrival ? mv.time_of_arrival : 0);
+                if (!arrival) continue;
+                
+                // Pega o ataque mais recente (maior arrival)
+                if (!latestArrival || arrival > latestArrival) {
+                    latestArrival = arrival;
+                }
+            }
+            
+            return latestArrival;
+        } catch (e) {
+            this.console.log('[AutoDodge] Erro ao buscar arrival atualizado: ' + e.message);
+            return null;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🆕 VERIFICA SE AINDA HÁ ATAQUES PARA UMA CIDADE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _hasIncomingAttacks(townId) {
+        try {
+            const models = uw.MM.getModels().MovementsUnits;
+            if (!models) return false;
+            
+            for (const key in models) {
+                const mv = models[key].attributes;
+                if (!mv) continue;
+                
+                const isAttack = mv.type === 'attack' || mv.type === 'attack_with_spy';
+                if (!isAttack) continue;
+                
+                if (String(mv.target_town_id) !== String(townId)) continue;
+                
+                const arrival = mv.arrival_at ? mv.arrival_at : (mv.time_of_arrival ? mv.time_of_arrival : 0);
+                if (!arrival) continue;
+                
+                // Verifica se o ataque ainda está a caminho (não chegou)
+                var now = this._gameNow();
+                if (arrival > now) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (e) {
+            return false;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -655,24 +731,15 @@ var AutoDodge = class extends MultUtil {
                     continue;
                 }
 
-                const remaining = entry.dueAt - Date.now();
-
-                if (remaining <= 0) {
-                    this.console.log('[AutoDodge] Recall de ' + entry.townName + ' (' + entry.label + ') ja deveria ter disparado - disparando agora.');
-                    this._removePendingRecall(recallKey);
-                    this._recallSupport(entry.townId, entry.townName, entry.commandId, entry.label);
-                } else {
-                    this.console.log('[AutoDodge] Recall de ' + entry.townName + ' (' + entry.label + ') reagendado para daqui a ' + Math.round(remaining / 1000) + 's.');
-                    // Usa o novo método preciso para reagendar
-                    this._startPreciseRecallCheck(
-                        recallKey, 
-                        entry.townId, 
-                        entry.townName, 
-                        entry.commandId, 
-                        entry.label, 
-                        entry.attackArrival || (entry.dueAt / 1000 - this.RECALL_BUFFER_SECONDS)
-                    );
-                }
+                // Reagenda com o novo método preciso
+                this.console.log('[AutoDodge] Recall de ' + entry.townName + ' (' + entry.label + ') reagendado com verificacao precisa.');
+                this._startPreciseRecallCheckWithUpdate(
+                    recallKey, 
+                    entry.townId, 
+                    entry.townName, 
+                    entry.commandId, 
+                    entry.label
+                );
             }
         } catch (e) {
             const msg = e && e.message ? e.message : e;

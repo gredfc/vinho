@@ -180,12 +180,11 @@ var MultBot = class {
     setup = () => {
         if (this.settingsFactory) this.settingsFactory.activate();
 
+        // ═══ ÍCONE DO MULTBOT - ALTERADO PARA LETRA "H" ═══
         uw.$('.gods_area_buttons').append(`
             <div class='circle_button mult_bot_settings' onclick='window.multBot.settingsFactory.openWindow()'>
-                <div style='width: 27px; height: 27px; display:flex; align-items:center; justify-content:center;' class='icon js-caption' title='MultBot'>
-                    <img src="https://github.com/NotXina.png?size=64" width="23" height="23"
-                         style="display:block; box-sizing:border-box; border-radius:50%; object-fit:cover; object-position:center; border:1px solid rgba(0,0,0,0.4); box-shadow:0 0 2px rgba(0,0,0,0.6);"
-                         onerror="this.outerHTML='⚙️'" />
+                <div style='width: 27px; height: 27px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:bold; color:#a29bfe; text-shadow:0 0 10px rgba(162,155,254,0.3);' class='icon js-caption' title='MultBot - Herald'>
+                    H
                 </div>
             </div>
         `);

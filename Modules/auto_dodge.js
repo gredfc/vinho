@@ -689,41 +689,68 @@
     };
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📦 REGISTRAR MÓDULO NO MULTBOT
+    // 📦 REGISTAR MÓDULO NO MULTBOT - ABA ATAQUE
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Esperar o MultBot carregar
-    var checkMultBot = setInterval(function() {
+    // Verificar se já existe um módulo registado com este nome
+    var checkAndRegister = function() {
         try {
-            if (typeof window.MultBot !== 'undefined' && window.MultBot.registerModule) {
-                clearInterval(checkMultBot);
+            // Verificar se o MultBot já existe
+            if (typeof window.MultBot === 'undefined') {
+                setTimeout(checkAndRegister, 500);
+                return;
+            }
 
-                // Registrar módulo na aba Ataque
-                window.MultBot.registerModule('AutoDodge', {
+            // Verificar se já existe um módulo com o nome AutoDodge
+            var existingModule = null;
+            if (window.MultBot.modules && window.MultBot.modules.AutoDodge) {
+                existingModule = window.MultBot.modules.AutoDodge;
+            }
+
+            // Se já existe e está na categoria errada, remover
+            if (existingModule && existingModule.category !== 'ataque') {
+                delete window.MultBot.modules.AutoDodge;
+                existingModule = null;
+            }
+
+            // Se não existe ou foi removido, registar
+            if (!existingModule) {
+                if (!window.MultBot.modules) {
+                    window.MultBot.modules = {};
+                }
+
+                window.MultBot.modules.AutoDodge = {
                     name: 'AutoDodge',
                     category: 'ataque',
                     order: 1,
                     settings: function() {
                         return AutoDodge.settings();
                     }
-                });
+                };
 
-                console.log('[AutoDodge] ✅ Módulo registrado na aba Ataque!');
-
-                // Iniciar se estava ativo
-                if (AutoDodge._active) {
-                    AutoDodge.start();
-                }
-
-                // Carregar módulo
-                if (window.MultBot.loadModule) {
-                    window.MultBot.loadModule('AutoDodge');
-                }
+                console.log('[AutoDodge] ✅ Módulo registado na aba Ataque!');
+            } else {
+                console.log('[AutoDodge] ✅ Módulo já registado na aba Ataque!');
             }
+
+            // Forçar recarregamento da aba se possível
+            if (window.MultBot.settingsFactory && typeof window.MultBot.settingsFactory.refreshTab === 'function') {
+                window.MultBot.settingsFactory.refreshTab('attack');
+            }
+
+            // Iniciar se estava ativo
+            if (AutoDodge._active) {
+                AutoDodge.start();
+            }
+
         } catch(e) {
-            // Silencioso
+            console.log('[AutoDodge] ⚠️ Erro ao registar módulo: ' + e.message);
+            setTimeout(checkAndRegister, 1000);
         }
-    }, 500);
+    };
+
+    // Iniciar registo
+    setTimeout(checkAndRegister, 100);
 
     // ═══════════════════════════════════════════════════════════════════════
     // 🚀 INICIALIZAÇÃO

@@ -22,12 +22,15 @@
 //     dois ciclos rodando ao mesmo tempo sobre o mesmo estado.
 //  4) _getTownName foi removido - usa this.getTownName (herdado de
 //     MultUtil), eliminando a duplicacao dessa logica.
+//  5) RETORNO PRECISO: verificacao a cada 100ms em vez de setTimeout
+//     unico - elimina atrasos de 20+ segundos.
 // ══════════════════════════════════════════════════════
 var AutoDodge = class extends MultUtil {
     EVACUATE_LEAD_SECONDS = 15;
-    RECALL_BUFFER_SECONDS = 20;
+    RECALL_BUFFER_SECONDS = 2; // MUDADO: agora so 2 segundos de margem (era 20)
     CAPTURE_DELAY_MS = 2500;
     ISLAND_SCRAPE_DELAY_MS = 400;
+    RECALL_CHECK_INTERVAL_MS = 100; // NOVO: verifica a cada 100ms
 
     constructor(c, s) {
         super(c, s);
@@ -469,31 +472,150 @@ var AutoDodge = class extends MultUtil {
         }
     }
 
-    /* Agenda o recall E PERSISTE a informacao no storage. Se a pagina
-       recarregar antes do timer disparar, o constructor do modulo (via
-       _reconcilePendingRecalls) vai encontrar essa entrada persistida
-       e cuidar dela - seja disparando na hora (se ja passou do prazo)
-       ou reagendando o tempo restante. */
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🆕 NOVO: AGENDAMENTO PRECISO DE RETORNO COM VERIFICAÇÃO A CADA 100ms
+    // ═══════════════════════════════════════════════════════════════════════
+
     _scheduleRecall(townId, townName, attackArrival, commandId, label) {
         const now = Math.floor(Date.now() / 1000);
         const rawSec = (attackArrival - now) + this.RECALL_BUFFER_SECONDS;
         const fireInSec = rawSec > this.RECALL_BUFFER_SECONDS ? rawSec : this.RECALL_BUFFER_SECONDS;
-        const fireInMs = fireInSec * 1000;
+        const dueAt = Date.now() + (fireInSec * 1000);
         const recallKey = townId + ':' + label;
-        const dueAt = Date.now() + fireInMs;
 
         this.console.log('[AutoDodge] ' + townName + ' (' + label + '): retorno agendado para daqui a ' + fireInSec + 's (comando #' + commandId + ').');
 
-        this._savePendingRecall(recallKey, { townId: townId, townName: townName, commandId: commandId, label: label, dueAt: dueAt });
+        // Persiste no storage
+        this._savePendingRecall(recallKey, { 
+            townId: townId, 
+            townName: townName, 
+            commandId: commandId, 
+            label: label, 
+            dueAt: dueAt,
+            attackArrival: attackArrival
+        });
 
-        const timeoutId = setTimeout(() => {
-            this._pendingRecalls.delete(recallKey);
-            this._removePendingRecall(recallKey);
-            this._recallSupport(townId, townName, commandId, label);
-        }, fireInMs);
-
-        this._pendingRecalls.set(recallKey, { timeoutId: timeoutId, commandId: commandId });
+        // ═══ NOVO: VERIFICAÇÃO PRECISA A CADA 100ms ═══
+        this._startPreciseRecallCheck(recallKey, townId, townName, commandId, label, attackArrival);
     }
+
+    _startPreciseRecallCheck(recallKey, townId, townName, commandId, label, attackArrival) {
+        var self = this;
+        
+        function checkRecall() {
+            try {
+                // Verifica se o recall ainda está pendente
+                if (!self._pendingRecalls.has(recallKey)) {
+                    return;
+                }
+
+                var now = self._gameNow();
+                var targetTime = attackArrival + self.RECALL_BUFFER_SECONDS;
+                
+                // Se já passou do tempo alvo, cancela
+                if (now >= targetTime) {
+                    self.console.log('[AutoDodge] ⏱️ ' + townName + ' (' + label + '): Atingiu o tempo alvo (' + now + ' >= ' + targetTime + ')');
+                    
+                    // Remove do storage
+                    self._removePendingRecall(recallKey);
+                    self._pendingRecalls.delete(recallKey);
+                    
+                    // Cancela o comando
+                    self._recallSupport(townId, townName, commandId, label);
+                    return;
+                }
+                
+                // Verifica se o comando ainda existe no jogo
+                var stillExists = self._checkCommandExists(commandId);
+                if (!stillExists) {
+                    self.console.log('[AutoDodge] ⚠️ ' + townName + ' (' + label + '): Comando #' + commandId + ' já não existe. Removendo recall.');
+                    self._removePendingRecall(recallKey);
+                    self._pendingRecalls.delete(recallKey);
+                    return;
+                }
+                
+                // Agenda a próxima verificação (100ms)
+                var timeoutId = setTimeout(checkRecall, self.RECALL_CHECK_INTERVAL_MS);
+                self._pendingRecalls.set(recallKey, { 
+                    timeoutId: timeoutId, 
+                    commandId: commandId,
+                    checkInterval: true
+                });
+                
+            } catch(e) {
+                self.console.log('[AutoDodge] ⚠️ Erro na verificação de retorno de ' + townName + ': ' + e.message);
+                // Tenta cancelar mesmo assim
+                self._recallSupport(townId, townName, commandId, label);
+                self._removePendingRecall(recallKey);
+                self._pendingRecalls.delete(recallKey);
+            }
+        }
+        
+        // Inicia a primeira verificação (após um pequeno atraso)
+        var now = this._gameNow();
+        var timeUntilTarget = (attackArrival + this.RECALL_BUFFER_SECONDS) - now;
+        
+        // Se já passou do tempo alvo, cancela imediatamente
+        if (timeUntilTarget <= 0) {
+            this.console.log('[AutoDodge] ⏱️ ' + townName + ' (' + label + '): Já passou do tempo alvo, cancelando imediatamente');
+            this._recallSupport(townId, townName, commandId, label);
+            this._removePendingRecall(recallKey);
+            this._pendingRecalls.delete(recallKey);
+            return;
+        }
+        
+        // Calcula o atraso inicial (máximo 2 segundos para não sobrecarregar)
+        var initialDelay = Math.min(timeUntilTarget * 1000, 2000);
+        
+        this.console.log('[AutoDodge] ⏱️ ' + townName + ' (' + label + '): Verificação agendada em ' + Math.round(initialDelay) + 'ms');
+        
+        var timeoutId = setTimeout(checkRecall, initialDelay);
+        this._pendingRecalls.set(recallKey, { 
+            timeoutId: timeoutId, 
+            commandId: commandId,
+            checkInterval: true
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🆕 NOVO: VERIFICA SE O COMANDO AINDA EXISTE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _checkCommandExists(commandId) {
+        try {
+            const models = uw.MM.getModels().Commands;
+            if (!models) return false;
+            
+            for (const key in models) {
+                const cmd = models[key].attributes;
+                if (cmd && cmd.id === commandId) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🆕 NOVO: GAME NOW MAIS PRECISO
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _gameNow() {
+        try {
+            if (uw.Timestamp && typeof uw.Timestamp.server === 'function') {
+                return uw.Timestamp.server();
+            }
+            return Math.floor(Date.now() / 1000);
+        } catch(e) { 
+            return Math.floor(Date.now() / 1000); 
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FIM DAS ALTERAÇÕES DE RETORNO PRECISO
+    // ═══════════════════════════════════════════════════════════════════════
 
     _loadPendingRecallsStore() {
         return this.storage.load('dodge_pending_recalls', {});
@@ -541,12 +663,15 @@ var AutoDodge = class extends MultUtil {
                     this._recallSupport(entry.townId, entry.townName, entry.commandId, entry.label);
                 } else {
                     this.console.log('[AutoDodge] Recall de ' + entry.townName + ' (' + entry.label + ') reagendado para daqui a ' + Math.round(remaining / 1000) + 's.');
-                    const timeoutId = setTimeout(() => {
-                        this._pendingRecalls.delete(recallKey);
-                        this._removePendingRecall(recallKey);
-                        this._recallSupport(entry.townId, entry.townName, entry.commandId, entry.label);
-                    }, remaining);
-                    this._pendingRecalls.set(recallKey, { timeoutId: timeoutId, commandId: entry.commandId });
+                    // Usa o novo método preciso para reagendar
+                    this._startPreciseRecallCheck(
+                        recallKey, 
+                        entry.townId, 
+                        entry.townName, 
+                        entry.commandId, 
+                        entry.label, 
+                        entry.attackArrival || (entry.dueAt / 1000 - this.RECALL_BUFFER_SECONDS)
+                    );
                 }
             }
         } catch (e) {

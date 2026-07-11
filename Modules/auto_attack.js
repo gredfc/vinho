@@ -1,50 +1,35 @@
-// ══════════════════════════════════════════════════════════
-//  MODULE: AutoAttack
-//  Monitora uma cidade atacante e, assim que TODAS as
-//  quantidades configuradas de uma composicao de unidades
-//  estiverem disponiveis, dispara ataques automaticamente
-//  para uma ou mais cidades-alvo, com a composicao completa
-//  em um unico envio.
-//
-//  PLUS: Sistema de Dodge integrado (Herald SO)
-//  Detecta ataques recebidos e envia suporte automaticamente
-//  com agrupamento inteligente.
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+//  MODULE: AutoDodge - Herald SO V49.2
+//  Dodge com AGRUPAMENTO + ATUALIZAÇÃO EM TEMPO REAL
+//  Mantido EXATAMENTE como no script original
+// ═══════════════════════════════════════════════════════════════════════
 
-var AutoAttack = class extends MultUtil {
-    CHECK_INTERVAL_MS = 20000;
-    SEND_DELAY_MS = 800;
-    JITTER_PERCENT = 0.10;
-    PLANS_LIST_MAX_HEIGHT = 110;
-
-    // ═══ CONFIGURAÇÕES DO DODGE ═══
-    DODGE_CONFIG = {
-        TEMPO_ANTECEDENCIA: 4,
-        INTERVALO_REFRESH_ATAQUES: 2,
-        MARGEM_SEGURANCA_RETORNO: 2,
-        DIFERENCA_ENVIO: 0.5,
-        JANELA_GRUPO: 10,
-        MIN_TROOPS_TO_DODGE: 1,
-        MAX_TROOPS_TO_SEND: 1000,
-        SOUND_ALERTS: true,
-        DEBUG: true,
-        AUTO_DODGE: true,
-    };
-
-    // CIDADES protegidas (cidade_atingida → cidade_que_envia_suporte)
-    DODGE_CIDADES = {};
-
-    UNIDADES_NAVAIS = ['bireme', 'trireme', 'attack_ship', 'demolition_ship', 'colonize_ship', 'small_transporter', 'big_transporter'];
-    UNIDADES_TERRESTRES = ['sword', 'archer', 'hoplite', 'slinger', 'rider', 'chariot', 'catapult', 'militia'];
-
+var AutoDodge = class extends MultUtil {
     constructor(c, s) {
         super(c, s);
-        this._active = false;
-        this._intervalId = null;
-        this._plans = this.storage.load('attack_plans', []);
-        this._stagingUnits = [];
 
-        // ═══ Estado do Dodge ═══
+        // ═══ CONFIGURAÇÃO (igual ao original) ═══
+        this.CIDADES = this.storage.load('dodge_cidades', {});
+
+        this.CONFIG = {
+            TEMPO_ANTECEDENCIA: 4,
+            INTERVALO_REFRESH_ATAQUES: 2,
+            MARGEM_SEGURANCA_RETORNO: 2,
+            DIFERENCA_ENVIO: 0.5,
+            JANELA_GRUPO: 10,
+            MIN_TROOPS_TO_DODGE: 1,
+            MAX_TROOPS_TO_SEND: 1000,
+            SOUND_ALERTS: true,
+            DEBUG: true,
+            AUTO_DODGE: true,
+        };
+
+        this.UNIDADES_NAVAIS = ['bireme', 'trireme', 'attack_ship', 'demolition_ship', 'colonize_ship', 'small_transporter', 'big_transporter'];
+        this.UNIDADES_TERRESTRES = ['sword', 'archer', 'hoplite', 'slinger', 'rider', 'chariot', 'catapult', 'militia'];
+
+        this.attackCommands = {};
+        this.troopsSent = {};
+
         this.dodgeState = {
             groupTimers: {},
             returnTimers: {},
@@ -53,28 +38,15 @@ var AutoAttack = class extends MultUtil {
             lastScan: 0,
             executedGroups: {},
         };
-        this.troopsSent = {};
-        this.attackCommands = {};
 
-        // Carregar cidades protegidas do storage
-        this.DODGE_CIDADES = this.storage.load('dodge_cidades', {});
-
-        this._migrateOldPlans();
-
-        if (this.storage.load('attack_active', false)) {
-            setTimeout(() => {
-                this.start();
-            }, 2000);
-        }
-
-        // ═══ Iniciar Dodge ═══
+        // Iniciar o Dodge
         setTimeout(() => {
             this._startDodge();
         }, 3000);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🛠️ FUNÇÕES AUXILIARES DO DODGE
+    // 🛠️ FUNÇÕES AUXILIARES (adaptadas para uw)
     // ═══════════════════════════════════════════════════════════════════════
 
     _gameNow() {
@@ -85,6 +57,51 @@ var AutoAttack = class extends MultUtil {
             return Date.now() / 1000;
         } catch(e) { return Date.now() / 1000; }
     }
+
+    _getGame() {
+        try {
+            return uw.Game;
+        } catch(e) { return null; }
+    }
+
+    _getMM() {
+        try {
+            return uw.MM;
+        } catch(e) { return null; }
+    }
+
+    _getITowns() {
+        try {
+            return uw.ITowns;
+        } catch(e) { return null; }
+    }
+
+    _log(message, type = 'info') {
+        if (!this.CONFIG.DEBUG && type === 'debug') return;
+        const icons = { info: '📘', success: '✅', warning: '⚠️', error: '❌', debug: '🔍', attack: '⚔️', dodge: '🛡️', naval: '🚢', ground: '⚔️', group: '📦' };
+        const icon = icons[type] || '📘';
+        this.console.log(`[HERALD] ${icon} [${new Date().toLocaleTimeString()}] ${message}`);
+    }
+
+    _playSound(type = 'warning') {
+        if (!this.CONFIG.SOUND_ALERTS) return;
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = type === 'danger' ? 800 : 600;
+            osc.type = 'sine';
+            gain.gain.value = 0.1;
+            osc.start();
+            osc.stop(ctx.currentTime + 0.2);
+        } catch(e) { /* Silencioso */ }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🧬 DETETAR TIPO DE ATAQUE (igual ao original)
+    // ═══════════════════════════════════════════════════════════════════════
 
     _detectAttackType(attrs) {
         if (attrs.type === 'attack_sea' || attrs.type === 'naval_attack') return 'naval';
@@ -102,69 +119,82 @@ var AutoAttack = class extends MultUtil {
         return 'mixed';
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🪖 OBTER UNIDADES DA CIDADE (igual ao original)
+    // ═══════════════════════════════════════════════════════════════════════
+
     _getUnitsFromTown(townId, attackType) {
         var units = {};
         var total = 0;
+        var MM = this._getMM();
 
         try {
-            const { models } = uw.MM.getOnlyCollectionByName('Units');
-            if (!models) return { units: units, total: 0 };
+            if (MM) {
+                const { models } = MM.getOnlyCollectionByName('Units');
+                if (models) {
+                    for (const model of models) {
+                        const attrs = model.attributes;
+                        if (String(attrs.home_town_id) !== String(townId)) continue;
+                        if (attrs.current_town_id && String(attrs.current_town_id) !== String(townId)) continue;
 
-            for (const model of models) {
-                const attrs = model.attributes;
-                if (String(attrs.home_town_id) !== String(townId)) continue;
-                if (attrs.current_town_id && String(attrs.current_town_id) !== String(townId)) continue;
-
-                for (let u in attrs) {
-                    if (!attrs.hasOwnProperty(u)) continue;
-                    if (u === 'id' || u === 'home_town_id' || u === 'current_town_id' ||
-                        u === 'current_town_player_id' || u === 'island_x' || u === 'island_y' ||
-                        u === 'number_on_island' || u === 'militia' || u === 'heroes' ||
-                        u === 'home_town_link' || u === 'current_town_link' ||
-                        u === 'current_player_link' || u === 'home_town_name' ||
-                        u === 'current_town_name' || u === 'same_island' ||
-                        u === 'god_favor' || u === 'god_power') continue;
-                    if (typeof attrs[u] === 'number' && attrs[u] > 0) {
-                        var isNaval = this.UNIDADES_NAVAIS.indexOf(u) !== -1;
-                        var isGround = this.UNIDADES_TERRESTRES.indexOf(u) !== -1;
-                        if (attackType === 'naval' && isNaval) {
-                            units[u] = (units[u] || 0) + attrs[u];
-                            total += attrs[u];
-                        } else if (attackType === 'ground' && isGround) {
-                            units[u] = (units[u] || 0) + attrs[u];
-                            total += attrs[u];
-                        } else if (attackType === 'mixed' || !attackType) {
-                            units[u] = (units[u] || 0) + attrs[u];
-                            total += attrs[u];
+                        for (var u in attrs) {
+                            if (!attrs.hasOwnProperty(u)) continue;
+                            if (u === 'id' || u === 'home_town_id' || u === 'current_town_id' ||
+                                u === 'current_town_player_id' || u === 'island_x' || u === 'island_y' ||
+                                u === 'number_on_island' || u === 'militia' || u === 'heroes' ||
+                                u === 'home_town_link' || u === 'current_town_link' ||
+                                u === 'current_player_link' || u === 'home_town_name' ||
+                                u === 'current_town_name' || u === 'same_island' ||
+                                u === 'god_favor' || u === 'god_power') continue;
+                            if (typeof attrs[u] === 'number' && attrs[u] > 0) {
+                                var isNaval = this.UNIDADES_NAVAIS.indexOf(u) !== -1;
+                                var isGround = this.UNIDADES_TERRESTRES.indexOf(u) !== -1;
+                                if (attackType === 'naval' && isNaval) {
+                                    units[u] = (units[u] || 0) + attrs[u];
+                                    total += attrs[u];
+                                } else if (attackType === 'ground' && isGround) {
+                                    units[u] = (units[u] || 0) + attrs[u];
+                                    total += attrs[u];
+                                } else if (attackType === 'mixed' || !attackType) {
+                                    units[u] = (units[u] || 0) + attrs[u];
+                                    total += attrs[u];
+                                }
+                            }
                         }
+                        break;
                     }
                 }
             }
         } catch(e) {
-            this.console.log('[AutoAttack/Dodge] Erro ao ler unidades: ' + e.message);
+            this._log(`❌ Erro ao ler unidades: ${e.message}`, 'error');
         }
 
         return { units: units, total: total };
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // 📤 ENVIAR SUPORTE (igual ao original, usando ajaxPostWithTimeout)
+    // ═══════════════════════════════════════════════════════════════════════
+
     _sendSupportForGroup(fromTownId, targetTownId, firstTime, lastTime, groupKey, attackType) {
         var timerKey = groupKey + '_' + attackType;
 
         if (this.troopsSent[timerKey]) {
-            this.console.log('[Dodge] ⏳ Tropas ' + attackType + ' já enviadas para este grupo');
+            this._log(`⏳ Tropas ${attackType} já enviadas para este grupo`, 'info');
             return;
         }
 
         var typeLabel = attackType === 'naval' ? '🚢 NAVAL' : attackType === 'ground' ? '⚔️ TERRESTRE' : '🔄 MISTO';
+        var Game = this._getGame();
 
-        if (!uw.Game || !uw.Game.csrfToken) {
-            this.console.log('[Dodge] ❌ Game não disponível para ' + typeLabel);
+        if (!Game || !Game.csrfToken) {
+            this._log(`❌ Game não disponível para ${typeLabel}`, 'error');
             return;
         }
 
         var result = this._getUnitsFromTown(fromTownId, attackType);
         if (result.total === 0) {
-            this.console.log('[Dodge] ⚠️ Nenhuma unidade ' + typeLabel + ' disponível em ' + fromTownId);
+            this._log(`⚠️ Nenhuma unidade ${typeLabel} disponível em ${fromTownId}`, 'warning');
             return;
         }
 
@@ -172,16 +202,14 @@ var AutoAttack = class extends MultUtil {
         var limitedTotal = 0;
         for (var u in result.units) {
             if (result.units.hasOwnProperty(u) && result.units[u] > 0) {
-                var amount = Math.min(result.units[u], this.DODGE_CONFIG.MAX_TROOPS_TO_SEND);
+                var amount = Math.min(result.units[u], this.CONFIG.MAX_TROOPS_TO_SEND);
                 limitedUnits[u] = amount;
                 limitedTotal += amount;
             }
         }
 
-        var returnTime = Math.max(lastTime - this._gameNow() + this.DODGE_CONFIG.MARGEM_SEGURANCA_RETORNO, 3);
-
-        this.console.log('[Dodge] 🪖 Enviando ' + limitedTotal + ' ' + typeLabel + ' tropas de ' + fromTownId + ' para ' + targetTownId);
-        this.console.log('[Dodge] ⏱️ Voltar ' + this.DODGE_CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS o último ataque');
+        this._log(`🪖 Enviando ${limitedTotal} ${typeLabel} tropas de ${fromTownId} para ${targetTownId}`, 'info');
+        this._log(`⏱️ Voltar ${this.CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS o último ataque`, 'info');
 
         var departTime = Math.ceil(this._gameNow()) + 1;
         var payload = {
@@ -199,26 +227,27 @@ var AutoAttack = class extends MultUtil {
         }
 
         var commandId = null;
+        var self = this;
 
         // Usar ajaxPostWithTimeout do MultUtil
-        this._withTownId(fromTownId, async () => {
+        this._withTownId(fromTownId, async function() {
             try {
-                const result = await this.ajaxPostWithTimeout('town_info', 'send_units', payload, 15000);
-                this.console.log('[Dodge] ✅ SUPORTE ' + typeLabel + ' ENVIADO com sucesso!');
-                if (this.DODGE_CONFIG.SOUND_ALERTS) this._playSound('success');
+                const result = await self.ajaxPostWithTimeout('town_info', 'send_units', payload, 15000);
+                self._log(`✅ SUPORTE ${typeLabel} ENVIADO com sucesso!`, 'success');
+                self._playSound('success');
 
-                this.troopsSent[timerKey] = true;
+                self.troopsSent[timerKey] = true;
 
-                // Tentar extrair command_id
                 try {
                     if (result && result.notifications) {
-                        for (let notif of result.notifications) {
+                        for (var i = 0; i < result.notifications.length; i++) {
+                            var notif = result.notifications[i];
                             if (notif && notif.param_str) {
                                 try {
                                     var data = JSON.parse(notif.param_str);
                                     if (data && data.MovementsUnits && data.MovementsUnits.command_id) {
                                         commandId = data.MovementsUnits.command_id;
-                                        this.console.log('[Dodge] 📋 Command ID ' + typeLabel + ': ' + commandId);
+                                        self._log(`📋 Command ID ${typeLabel}: ${commandId}`, 'debug');
                                         break;
                                     }
                                 } catch(e) {}
@@ -229,29 +258,29 @@ var AutoAttack = class extends MultUtil {
 
                 if (commandId) {
                     var cmdKey = groupKey + '_' + attackType;
-                    this.attackCommands[cmdKey] = commandId;
+                    self.attackCommands[cmdKey] = commandId;
 
-                    var cancelDelay = (lastTime - this._gameNow() + this.DODGE_CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000;
+                    var cancelDelay = (lastTime - self._gameNow() + self.CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000;
                     cancelDelay = Math.max(cancelDelay, 1000);
 
                     var timerKey2 = groupKey + '_' + attackType;
-                    if (this.dodgeState.returnTimers[timerKey2]) {
-                        clearTimeout(this.dodgeState.returnTimers[timerKey2]);
+                    if (self.dodgeState.returnTimers[timerKey2]) {
+                        clearTimeout(self.dodgeState.returnTimers[timerKey2]);
                     }
 
-                    this.dodgeState.returnTimers[timerKey2] = setTimeout(() => {
-                        this._cancelCommand(commandId, fromTownId, attackType, groupKey);
-                        delete this.troopsSent[timerKey2];
+                    self.dodgeState.returnTimers[timerKey2] = setTimeout(function() {
+                        self._cancelCommand(commandId, fromTownId, attackType, groupKey);
+                        delete self.troopsSent[timerKey2];
                     }, cancelDelay);
 
-                    this.console.log('[Dodge] ⏱️ ' + typeLabel + ' programado para voltar ' + this.DODGE_CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS');
+                    self._log(`⏱️ ${typeLabel} programado para voltar ${self.CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS`, 'info');
                 } else {
-                    this.console.log('[Dodge] ⚠️ Não foi possível extrair command_id para ' + typeLabel);
+                    self._log(`⚠️ Não foi possível extrair command_id para ${typeLabel}`, 'warning');
                 }
 
                 return result;
             } catch(e) {
-                this.console.log('[Dodge] ❌ Erro ' + typeLabel + ': ' + e.message);
+                self._log(`❌ Erro ${typeLabel}: ${e.message}`, 'error');
                 throw e;
             }
         });
@@ -259,12 +288,17 @@ var AutoAttack = class extends MultUtil {
         return commandId;
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🚫 CANCELAR COMANDO (igual ao original)
+    // ═══════════════════════════════════════════════════════════════════════
+
     _cancelCommand(commandId, townId, attackType, groupKey) {
         var typeLabel = attackType === 'naval' ? '🚢 NAVAL' : attackType === 'ground' ? '⚔️ TERRESTRE' : '🔄 MISTO';
-        this.console.log('[Dodge] 🚫 CANCELANDO ' + typeLabel + ' comando #' + commandId);
+        this._log(`🚫 CANCELANDO ${typeLabel} comando #${commandId}`, 'dodge');
 
-        if (!uw.Game || !uw.Game.csrfToken) {
-            this.console.log('[Dodge] ❌ Game não disponível para ' + typeLabel);
+        var Game = this._getGame();
+        if (!Game || !Game.csrfToken) {
+            this._log(`❌ Game não disponível para ${typeLabel}`, 'error');
             return;
         }
 
@@ -277,43 +311,33 @@ var AutoAttack = class extends MultUtil {
             nl_init: true
         };
 
-        this._withTownId(townId, async () => {
+        var self = this;
+
+        this._withTownId(townId, async function() {
             try {
-                await this.ajaxPostWithTimeout('frontend_bridge', 'execute', payload, 15000);
-                this.console.log('[Dodge] ✅ TROPAS ' + typeLabel + ' VOLTARAM!');
-                if (this.DODGE_CONFIG.SOUND_ALERTS) this._playSound('success');
+                await self.ajaxPostWithTimeout('frontend_bridge', 'execute', payload, 15000);
+                self._log(`✅ TROPAS ${typeLabel} VOLTARAM!`, 'success');
+                self._playSound('success');
 
                 var timerKey = groupKey + '_' + attackType;
-                if (this.dodgeState.returnTimers[timerKey]) {
-                    clearTimeout(this.dodgeState.returnTimers[timerKey]);
-                    delete this.dodgeState.returnTimers[timerKey];
+                if (self.dodgeState.returnTimers[timerKey]) {
+                    clearTimeout(self.dodgeState.returnTimers[timerKey]);
+                    delete self.dodgeState.returnTimers[timerKey];
                 }
 
-                if (this.dodgeState.groupStatus[groupKey]) {
-                    this.dodgeState.groupStatus[groupKey].status = 'cancelled';
+                if (self.dodgeState.groupStatus[groupKey]) {
+                    self.dodgeState.groupStatus[groupKey].status = 'cancelled';
                 }
-                this._updateDodgePanel();
+                self._updatePanel();
             } catch(e) {
-                this.console.log('[Dodge] ❌ Erro ao cancelar ' + typeLabel + ': ' + e.message);
+                self._log(`❌ Erro ao cancelar ${typeLabel}: ${e.message}`, 'error');
             }
         });
     }
 
-    _playSound(type = 'warning') {
-        if (!this.DODGE_CONFIG.SOUND_ALERTS) return;
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.frequency.value = type === 'danger' ? 800 : 600;
-            osc.type = 'sine';
-            gain.gain.value = 0.1;
-            osc.start();
-            osc.stop(ctx.currentTime + 0.2);
-        } catch(e) { /* Silencioso */ }
-    }
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🔍 SCAN DE ATAQUES (igual ao original)
+    // ═══════════════════════════════════════════════════════════════════════
 
     _scanAttacks() {
         var now = Date.now();
@@ -322,15 +346,18 @@ var AutoAttack = class extends MultUtil {
         this.dodgeState.lastScan = now;
 
         try {
-            const { models } = uw.MM.getOnlyCollectionByName('MovementsUnits');
+            var MM = this._getMM();
+            if (!MM) { this.dodgeState.isScanning = false; return; }
+
+            const { models } = MM.getOnlyCollectionByName('MovementsUnits');
             if (!models) { this.dodgeState.isScanning = false; return; }
 
             var nowTime = this._gameNow();
-            var myTowns = uw.ITowns.towns || {};
+            var ITowns = this._getITowns();
+            var myTowns = ITowns && ITowns.towns ? ITowns.towns : {};
 
-            // 1. COLETAR TODOS OS ATAQUES POR CIDADE
             var cityAttacks = {};
-            var cidades = this.DODGE_CIDADES;
+            var CIDADES = this.CIDADES;
 
             for (const model of models) {
                 const attrs = model.attributes;
@@ -344,7 +371,7 @@ var AutoAttack = class extends MultUtil {
                 if (!attrs.arrival_at || attrs.arrival_at < nowTime) continue;
 
                 var townId = attrs.target_town_id;
-                if (cidades[townId] === undefined) continue;
+                if (CIDADES[townId] === undefined) continue;
 
                 if (!cityAttacks[townId]) {
                     cityAttacks[townId] = [];
@@ -356,7 +383,6 @@ var AutoAttack = class extends MultUtil {
                 });
             }
 
-            // 2. AGRUPAR ATAQUES POR CIDADE
             for (var townId in cityAttacks) {
                 if (!cityAttacks.hasOwnProperty(townId)) continue;
 
@@ -365,16 +391,18 @@ var AutoAttack = class extends MultUtil {
 
                 attacks.sort(function(a, b) { return a.arrival - b.arrival; });
 
-                var destino = cidades[townId];
-                if (!destino) continue;
+                var destino = CIDADES[townId];
+                if (!destino) {
+                    this._log(`⚠️ Cidade ${townId} sem destino configurado!`, 'warning');
+                    continue;
+                }
 
-                // 3. CRIAR GRUPOS
                 var groups = [];
                 var currentGroup = [attacks[0]];
 
                 for (var i = 1; i < attacks.length; i++) {
                     var gap = attacks[i].arrival - attacks[i-1].arrival;
-                    if (gap <= this.DODGE_CONFIG.JANELA_GRUPO) {
+                    if (gap <= this.CONFIG.JANELA_GRUPO) {
                         currentGroup.push(attacks[i]);
                     } else {
                         groups.push(currentGroup);
@@ -383,7 +411,6 @@ var AutoAttack = class extends MultUtil {
                 }
                 groups.push(currentGroup);
 
-                // 4. PROCESSAR CADA GRUPO
                 for (var g = 0; g < groups.length; g++) {
                     var group = groups[g];
                     var firstTime = group[0].arrival;
@@ -397,13 +424,12 @@ var AutoAttack = class extends MultUtil {
 
                     if (timeToFirst > 60) continue;
 
-                    // Verificar se já existe grupo para esta cidade
                     var existingGroupKey = null;
                     for (var existingKey in this.dodgeState.groupStatus) {
                         if (this.dodgeState.groupStatus.hasOwnProperty(existingKey)) {
                             var data = this.dodgeState.groupStatus[existingKey];
                             if (data && data.townId == townId && !data.dodged) {
-                                if (Math.abs(data.lastTime - lastTime) <= this.DODGE_CONFIG.JANELA_GRUPO) {
+                                if (Math.abs(data.lastTime - lastTime) <= this.CONFIG.JANELA_GRUPO) {
                                     existingGroupKey = existingKey;
                                     break;
                                 }
@@ -412,7 +438,6 @@ var AutoAttack = class extends MultUtil {
                     }
 
                     if (existingGroupKey) {
-                        // ATUALIZAR GRUPO EXISTENTE
                         var existingData = this.dodgeState.groupStatus[existingGroupKey];
                         for (var a = 0; a < group.length; a++) {
                             var exists = existingData.attacks.some(function(att) { return att.cmdId === group[a].cmdId; });
@@ -425,21 +450,21 @@ var AutoAttack = class extends MultUtil {
                         existingData.lastTime = existingData.attacks[existingData.attacks.length - 1].arrival;
                         existingData.isGroup = existingData.attacks.length > 1;
 
-                        this.console.log('[Dodge] 📦 GRUPO ATUALIZADO para ' + townId + ': ' + existingData.attacks.length + ' ataques');
+                        this._log(`📦 GRUPO ATUALIZADO para ${townId}: ${existingData.attacks.length} ataques`, 'group');
 
                         if (this.dodgeState.groupTimers[existingGroupKey]) {
                             clearTimeout(this.dodgeState.groupTimers[existingGroupKey]);
                         }
 
-                        var newDodgeDelay = Math.max(existingData.firstTime - nowTime - this.DODGE_CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
-                        this.dodgeState.groupTimers[existingGroupKey] = setTimeout(() => {
-                            this._executeDodgeForGroup(existingData.townId, existingData.destino, existingData.firstTime, existingData.lastTime, existingData.attacks, existingGroupKey, existingData.isGroup);
+                        var newDodgeDelay = Math.max(existingData.firstTime - nowTime - this.CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
+                        var self = this;
+                        this.dodgeState.groupTimers[existingGroupKey] = setTimeout(function() {
+                            self._executeDodgeForGroup(existingData.townId, existingData.destino, existingData.firstTime, existingData.lastTime, existingData.attacks, existingGroupKey, existingData.isGroup);
                         }, newDodgeDelay);
 
                         continue;
                     }
 
-                    // CRIAR NOVO GRUPO
                     this.dodgeState.groupStatus[groupKey] = {
                         townId: townId,
                         destino: destino,
@@ -452,81 +477,93 @@ var AutoAttack = class extends MultUtil {
                     };
 
                     var typeLabel = isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
-                    this.console.log('[Dodge] ' + typeLabel + ' para ' + townId + ' (' + group.length + ' ataques)');
+                    this._log(`${typeLabel} para ${townId} (${group.length} ataques)`, isGroup ? 'group' : 'attack');
 
-                    // AGENDAR DODGE
-                    var dodgeDelay = Math.max(firstTime - nowTime - this.DODGE_CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
+                    var dodgeDelay = Math.max(firstTime - nowTime - this.CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
 
                     if (this.dodgeState.groupTimers[groupKey]) {
                         clearTimeout(this.dodgeState.groupTimers[groupKey]);
                     }
 
-                    this.dodgeState.groupTimers[groupKey] = setTimeout(() => {
-                        this._executeDodgeForGroup(townId, destino, firstTime, lastTime, group, groupKey, isGroup);
+                    var self = this;
+                    this.dodgeState.groupTimers[groupKey] = setTimeout(function() {
+                        self._executeDodgeForGroup(townId, destino, firstTime, lastTime, group, groupKey, isGroup);
                     }, dodgeDelay);
                 }
             }
 
-            this._updateDodgePanel();
+            this._updatePanel();
 
         } catch(e) {
-            this.console.log('[Dodge] ⚠️ Erro no scan: ' + e.message);
+            this._log(`⚠️ Erro no scan: ${e.message}`, 'error');
         }
 
         this.dodgeState.isScanning = false;
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⚡ EXECUTAR DODGE PARA UM GRUPO (igual ao original)
+    // ═══════════════════════════════════════════════════════════════════════
+
     _executeDodgeForGroup(townId, destino, firstTime, lastTime, attacks, groupKey, isGroup) {
         try {
             if (this.dodgeState.executedGroups[groupKey]) {
-                this.console.log('[Dodge] ℹ️ Grupo ' + groupKey + ' já executado');
+                this._log(`ℹ️ Grupo ${groupKey} já executado`, 'info');
                 return;
             }
 
             var troops = this._getUnitsFromTown(townId, 'mixed');
-            if (troops.total < this.DODGE_CONFIG.MIN_TROOPS_TO_DODGE) {
-                this.console.log('[Dodge] ⚠️ Tropas insuficientes em ' + townId + ': ' + troops.total);
+            if (troops.total < this.CONFIG.MIN_TROOPS_TO_DODGE) {
+                this._log(`⚠️ Tropas insuficientes em ${townId}: ${troops.total}`, 'warning');
                 if (this.dodgeState.groupStatus[groupKey]) {
                     this.dodgeState.groupStatus[groupKey].status = 'failed';
                 }
-                this._updateDodgePanel();
+                this._updatePanel();
                 return;
             }
 
             var typeLabel = isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
-            this.console.log('[Dodge] ⚡ EXECUTANDO DODGE ' + typeLabel + ' para ' + townId + ' (' + attacks.length + ' ataques)');
-            if (this.DODGE_CONFIG.SOUND_ALERTS) this._playSound('danger');
+            var numAttacks = attacks.length;
+            this._log(`⚡ EXECUTANDO DODGE ${typeLabel} para ${townId} (${numAttacks} ataques)`, 'dodge');
+            this._playSound('danger');
 
             this.dodgeState.executedGroups[groupKey] = true;
 
-            // ENVIAR TERRESTRES
+            var self = this;
+
             this._sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'ground');
 
-            // ENVIAR NAVAIS (com delay)
-            setTimeout(() => {
-                this._sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'naval');
-            }, this.DODGE_CONFIG.DIFERENCA_ENVIO * 1000);
+            setTimeout(function() {
+                self._sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'naval');
+            }, this.CONFIG.DIFERENCA_ENVIO * 1000);
 
             if (this.dodgeState.groupStatus[groupKey]) {
                 this.dodgeState.groupStatus[groupKey].dodged = true;
                 this.dodgeState.groupStatus[groupKey].status = 'dodged';
             }
 
-            this.console.log('[Dodge] ✅ Dodge executado para ' + groupKey + '!');
+            this._log(`✅ Dodge executado para ${groupKey}!`, 'success');
 
         } catch(e) {
-            this.console.log('[Dodge] ❌ Erro ao executar dodge: ' + e.message);
+            this._log(`❌ Erro ao executar dodge: ${e.message}`, 'error');
             if (this.dodgeState.groupStatus[groupKey]) {
                 this.dodgeState.groupStatus[groupKey].status = 'failed';
             }
         }
-        this._updateDodgePanel();
+        this._updatePanel();
     }
 
-    _updateDodgePanel() {
-        // Atualiza o painel se ele existir
-        const container = uw.$('#dodge_panel_container');
-        if (!container.length) return;
+    // ═══════════════════════════════════════════════════════════════════════
+    // 📋 UPDATE PANEL - EXATAMENTE IGUAL AO ORIGINAL
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _updatePanel() {
+        var panel = document.getElementById('herald-panel');
+        if (!panel) return;
+
+        var list = panel.querySelector('.hw-attack-list');
+        if (!list) return;
+        list.innerHTML = '';
 
         var now = this._gameNow();
         var attackCount = 0;
@@ -541,24 +578,45 @@ var AutoAttack = class extends MultUtil {
             }
         }
 
-        let html = '';
         if (groups.length === 0) {
-            html = '<div style="text-align:center;color:#7a5c2a;padding:10px;font-size:11px;">🛡️ Nenhum ataque detectado</div>';
+            list.innerHTML = `
+                <div class="hw-empty-state">
+                    <div class="hw-empty-icon">🛡️</div>
+                    <div>Nenhum ataque detectado</div>
+                    <div style="font-size:10px;color:#555;margin-top:4px;">${Object.keys(this.CIDADES).length} cidades protegidas</div>
+                </div>
+            `;
         } else {
             groups.sort(function(a, b) { return a.firstTime - b.firstTime; });
 
             for (var i = 0; i < groups.length; i++) {
                 var data = groups[i];
+                var item = document.createElement('div');
+                item.className = 'hw-attack-item';
+
+                if (data.dodged) {
+                    item.classList.add('hw-dodged');
+                }
+                if (data.isGroup) {
+                    item.classList.add('hw-group');
+                }
+                if (data.status === 'failed') {
+                    item.classList.add('hw-failed');
+                }
+
                 var timeLeft = Math.round(data.firstTime - now);
                 var timeStr = timeLeft > 0 ? (timeLeft > 60 ? Math.round(timeLeft / 60) + 'm ' + (timeLeft % 60) + 's' : timeLeft + 's') : '💥';
 
                 var timeColor = '';
-                if (timeLeft < 5 && timeLeft > 0) timeColor = 'color:#ff6b6b;font-weight:700;';
-                else if (timeLeft < 15 && timeLeft > 0) timeColor = 'color:#fdcb6e;font-weight:700;';
-                else if (timeLeft > 0) timeColor = 'color:#00b894;';
+                if (timeLeft < 5 && timeLeft > 0) timeColor = 'hw-urgent';
+                else if (timeLeft < 15 && timeLeft > 0) timeColor = 'hw-warning';
+                else if (timeLeft > 0) timeColor = 'hw-safe';
 
                 var typeLabel = data.isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
-                var badgeHtml = data.isGroup ? '<span style="background:#fdcb6e;color:#000;font-size:8px;padding:2px 8px;border-radius:10px;font-weight:700;">' + data.attacks.length + ' ataques</span>' : '';
+                var badgeHtml = '';
+                if (data.isGroup) {
+                    badgeHtml = `<span class="hw-attack-badge hw-badge-group">${data.attacks.length} ataques</span>`;
+                }
 
                 var statusMap = {
                     'waiting': '⏳ Aguardando',
@@ -566,169 +624,615 @@ var AutoAttack = class extends MultUtil {
                     'cancelled': '✅ Voltou',
                     'failed': '❌ Falhou'
                 };
-                var statusText = statusMap[data.status] || '⏳ Aguardando';
+                var statusClassMap = {
+                    'waiting': 'hw-status-waiting',
+                    'dodged': 'hw-status-dodged',
+                    'cancelled': 'hw-status-cancelled',
+                    'failed': 'hw-status-failed'
+                };
 
-                html += '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:6px 10px;margin:3px 0;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;font-size:11px;">';
-                html += '<span style="font-weight:600;color:#ddd;">🏙️ ' + data.townId + ' → ' + data.destino + '</span>';
-                html += '<span style="font-size:9px;color:#888;">' + typeLabel + '</span>';
-                html += badgeHtml;
-                html += '<span style="' + timeColor + '">⏱️ ' + timeStr + '</span>';
-                html += '<span style="font-size:9px;color:#666;">' + new Date(data.firstTime * 1000).toLocaleTimeString() + ' → ' + new Date(data.lastTime * 1000).toLocaleTimeString() + '</span>';
-                html += '<span style="font-size:9px;color:#00b894;">↩️ ' + new Date((data.lastTime + this.DODGE_CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000).toLocaleTimeString() + '</span>';
-                html += '<span style="font-size:8px;padding:2px 10px;border-radius:10px;text-transform:uppercase;font-weight:700;background:rgba(116,185,255,0.15);color:#74b9ff;">' + statusText + '</span>';
-                html += '</div>';
+                var statusText = statusMap[data.status] || '⏳ Aguardando';
+                var statusClass = statusClassMap[data.status] || 'hw-status-waiting';
+
+                var firstStr = new Date(data.firstTime * 1000).toLocaleTimeString();
+                var lastStr = new Date(data.lastTime * 1000).toLocaleTimeString();
+                var returnStr = new Date((data.lastTime + this.CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000).toLocaleTimeString();
+
+                item.innerHTML = `
+                    <span class="hw-attack-to">🏙️ ${data.townId} → ${data.destino}</span>
+                    <span style="font-size:10px;color:#888;">${typeLabel}</span>
+                    ${badgeHtml}
+                    <span class="hw-attack-time ${timeColor}">⏱️ ${timeStr}</span>
+                    <span style="font-size:9px;color:#666;">${firstStr} → ${lastStr}</span>
+                    <span style="font-size:9px;color:#00b894;">↩️ ${returnStr}</span>
+                    <span class="hw-attack-status ${statusClass}">${statusText}</span>
+                `;
+
+                list.appendChild(item);
                 attackCount++;
             }
         }
 
-        // Atualizar contador no título
-        const counter = uw.$('#dodge_counter');
-        if (counter.length) {
-            counter.text(attackCount);
-            if (attackCount > 0) {
-                counter.css('color', '#ff6b6b');
-            } else {
-                counter.css('color', '#888');
-            }
+        var counter = panel.querySelector('.hw-count');
+        if (counter) {
+            counter.textContent = attackCount;
+            counter.classList.toggle('hw-count-danger', attackCount > 0);
         }
 
-        container.html(html);
+        var icon = document.querySelector('.hw-control-icon');
+        if (icon) {
+            var badge = icon.querySelector('.hw-icon-badge');
+            if (attackCount > 0) {
+                icon.classList.add('hw-has-attacks');
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'hw-icon-badge';
+                    icon.appendChild(badge);
+                }
+                badge.textContent = attackCount;
+            } else {
+                icon.classList.remove('hw-has-attacks');
+                if (badge) badge.remove();
+            }
+        }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🎨 PAINEL - EXATAMENTE IGUAL AO ORIGINAL
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _addHeraldIcon() {
+        var icon = document.createElement('span');
+        icon.className = 'hw-control-icon';
+        icon.innerHTML = '🛡️';
+        icon.title = 'Herald SO - Dodge V49.2';
+
+        var target = document.querySelector('#header .controls') ||
+            document.querySelector('.controls') ||
+            document.querySelector('#header-controls');
+
+        if (target) {
+            target.appendChild(icon);
+        } else {
+            var fallback = document.createElement('div');
+            fallback.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,0.7);border-radius:8px;padding:6px;cursor:pointer;';
+            fallback.appendChild(icon);
+            document.body.appendChild(fallback);
+        }
+
+        var self = this;
+        icon.addEventListener('click', function() { self._showPanel(); });
+        this._log('✅ Ícone adicionado', 'success');
+    }
+
+    _showPanel() {
+        var existing = document.getElementById('herald-panel');
+        if (existing) {
+            existing.style.display = existing.style.display === 'none' ? 'flex' : 'none';
+            return;
+        }
+
+        var panel = document.createElement('div');
+        panel.id = 'herald-panel';
+
+        // CSS INJECTADO DIRETAMENTE (igual ao original)
+        // Nota: o CSS já foi injetado via GM_addStyle no original,
+        // mas aqui vamos usar o mesmo CSS inline para manter compatibilidade
+
+        var style = document.createElement('style');
+        style.textContent = `
+            #herald-panel {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                width: 420px;
+                max-width: 95vw;
+                max-height: 85vh;
+                background: #1a1a2e;
+                border: 1px solid #333;
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+                z-index: 999999;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                color: #eee;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            #herald-panel .hw-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 16px;
+                background: #16213e;
+                border-bottom: 1px solid #333;
+                flex-shrink: 0;
+            }
+            #herald-panel .hw-title {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 14px;
+                font-weight: 700;
+                color: #a29bfe;
+            }
+            #herald-panel .hw-controls {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            #herald-panel .hw-close {
+                color: #888;
+                font-size: 18px;
+                cursor: pointer;
+                padding: 0 8px;
+                background: none;
+                border: none;
+            }
+            #herald-panel .hw-close:hover { color: #ff6b6b; }
+            #herald-panel .hw-toolbar {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+                padding: 8px 12px;
+                background: #0f0f1a;
+                border-bottom: 1px solid #333;
+                flex-shrink: 0;
+                align-items: center;
+            }
+            #herald-panel .hw-toolbar .hw-search {
+                flex: 1;
+                min-width: 80px;
+                background: #222;
+                color: #eee;
+                border: 1px solid #444;
+                border-radius: 6px;
+                padding: 4px 10px;
+                font-size: 11px;
+                outline: none;
+            }
+            #herald-panel .hw-toolbar .hw-search:focus {
+                border-color: #6c5ce7;
+            }
+            #herald-panel .hw-toolbar .hw-counter {
+                font-size: 11px;
+                color: #888;
+                padding: 4px 10px;
+                background: #222;
+                border-radius: 6px;
+                white-space: nowrap;
+            }
+            #herald-panel .hw-toolbar .hw-counter .hw-count {
+                color: #a29bfe;
+                font-weight: 700;
+            }
+            #herald-panel .hw-toolbar .hw-counter .hw-count.hw-count-danger {
+                color: #ff6b6b;
+            }
+            #herald-panel .hw-toolbar .hw-btn {
+                background: #222;
+                color: #aaa;
+                border: 1px solid #444;
+                border-radius: 6px;
+                padding: 4px 10px;
+                font-size: 10px;
+                cursor: pointer;
+            }
+            #herald-panel .hw-toolbar .hw-btn:hover {
+                border-color: #6c5ce7;
+                color: #fff;
+            }
+            #herald-panel .hw-toolbar .hw-btn.hw-btn-danger {
+                background: #ff6b6b;
+                color: #fff;
+                border: none;
+            }
+            #herald-panel .hw-toolbar .hw-btn.hw-btn-success {
+                background: #00b894;
+                color: #fff;
+                border: none;
+            }
+            #herald-panel .hw-attack-list {
+                flex: 1;
+                overflow-y: auto;
+                padding: 8px 12px;
+                min-height: 100px;
+                max-height: 400px;
+            }
+            #herald-panel .hw-attack-list::-webkit-scrollbar {
+                width: 4px;
+            }
+            #herald-panel .hw-attack-list::-webkit-scrollbar-thumb {
+                background: #6c5ce7;
+                border-radius: 4px;
+            }
+            #herald-panel .hw-empty-state {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                min-height: 80px;
+                color: #666;
+                font-size: 12px;
+                text-align: center;
+            }
+            #herald-panel .hw-empty-state .hw-empty-icon {
+                font-size: 28px;
+                margin-bottom: 6px;
+                opacity: 0.5;
+            }
+            #herald-panel .hw-attack-item {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 6px 10px;
+                padding: 8px 12px;
+                margin: 3px 0;
+                background: rgba(255,255,255,0.03);
+                border: 1px solid rgba(255,255,255,0.06);
+                border-radius: 8px;
+                font-size: 12px;
+            }
+            #herald-panel .hw-attack-item.hw-dodged {
+                border-color: rgba(0, 184, 148, 0.3);
+                background: rgba(0, 184, 148, 0.05);
+            }
+            #herald-panel .hw-attack-item.hw-group {
+                border-color: rgba(253, 203, 110, 0.3);
+                background: rgba(253, 203, 110, 0.05);
+            }
+            #herald-panel .hw-attack-item.hw-failed {
+                border-color: rgba(255, 107, 107, 0.3);
+                background: rgba(255, 107, 107, 0.05);
+            }
+            #herald-panel .hw-attack-to {
+                font-weight: 600;
+                color: #ddd;
+            }
+            #herald-panel .hw-attack-badge {
+                font-size: 8px;
+                padding: 2px 8px;
+                border-radius: 10px;
+                background: #6c5ce7;
+                color: #fff;
+                font-weight: 700;
+            }
+            #herald-panel .hw-attack-badge.hw-badge-group {
+                background: #fdcb6e;
+                color: #000;
+            }
+            #herald-panel .hw-attack-time {
+                font-size: 11px;
+                color: #888;
+            }
+            #herald-panel .hw-attack-time.hw-urgent {
+                color: #ff6b6b;
+                font-weight: 700;
+            }
+            #herald-panel .hw-attack-time.hw-warning {
+                color: #fdcb6e;
+                font-weight: 700;
+            }
+            #herald-panel .hw-attack-time.hw-safe {
+                color: #00b894;
+            }
+            #herald-panel .hw-attack-status {
+                font-size: 8px;
+                padding: 2px 10px;
+                border-radius: 10px;
+                text-transform: uppercase;
+                font-weight: 700;
+            }
+            #herald-panel .hw-attack-status.hw-status-waiting {
+                background: rgba(116, 185, 255, 0.15);
+                color: #74b9ff;
+            }
+            #herald-panel .hw-attack-status.hw-status-dodged {
+                background: rgba(0, 184, 148, 0.15);
+                color: #00b894;
+            }
+            #herald-panel .hw-attack-status.hw-status-cancelled {
+                background: rgba(253, 203, 110, 0.1);
+                color: #fdcb6e;
+            }
+            #herald-panel .hw-attack-status.hw-status-failed {
+                background: rgba(255, 107, 107, 0.15);
+                color: #ff6b6b;
+            }
+            #herald-panel .hw-footer {
+                padding: 6px 12px;
+                border-top: 1px solid #333;
+                font-size: 9px;
+                color: #555;
+                text-align: center;
+                background: #0f0f1a;
+                flex-shrink: 0;
+            }
+            .hw-control-icon {
+                display: inline-block;
+                cursor: pointer;
+                font-size: 16px;
+                padding: 4px 8px;
+                opacity: 0.6;
+                position: relative;
+            }
+            .hw-control-icon:hover {
+                opacity: 1;
+            }
+            .hw-control-icon.hw-has-attacks {
+                opacity: 1;
+            }
+            .hw-control-icon .hw-icon-badge {
+                position: absolute;
+                top: -4px;
+                right: -4px;
+                background: #ff6b6b;
+                color: #fff;
+                border-radius: 50%;
+                font-size: 9px;
+                padding: 1px 6px;
+                min-width: 16px;
+                text-align: center;
+                font-weight: 700;
+            }
+            .hw-toggle {
+                position: relative;
+                width: 30px;
+                height: 16px;
+                flex-shrink: 0;
+            }
+            .hw-toggle input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .hw-toggle .hw-toggle-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: #444;
+                transition: 0.3s;
+                border-radius: 16px;
+            }
+            .hw-toggle .hw-toggle-slider:before {
+                position: absolute;
+                content: "";
+                height: 12px;
+                width: 12px;
+                left: 2px;
+                bottom: 2px;
+                background: #888;
+                transition: 0.3s;
+                border-radius: 50%;
+            }
+            .hw-toggle input:checked + .hw-toggle-slider {
+                background: #6c5ce7;
+            }
+            .hw-toggle input:checked + .hw-toggle-slider:before {
+                transform: translateX(14px);
+                background: #fff;
+            }
+            @media (max-width: 600px) {
+                #herald-panel {
+                    width: 95vw;
+                    bottom: 10px;
+                    right: 10px;
+                    border-radius: 10px;
+                    max-height: 90vh;
+                }
+                #herald-panel .hw-attack-item {
+                    font-size: 11px;
+                    padding: 6px 10px;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        panel.innerHTML = `
+            <div class="hw-header">
+                <div class="hw-title">
+                    <span>🛡️</span>
+                    Herald SO
+                    <span style="font-size:9px;background:#6c5ce7;padding:2px 8px;border-radius:10px;color:#fff;">V49.2</span>
+                </div>
+                <div class="hw-controls">
+                    <span class="hw-counter">⚔️ <span class="hw-count">0</span></span>
+                    <button class="hw-close" onclick="this.closest('#herald-panel').style.display='none'">✕</button>
+                </div>
+            </div>
+
+            <div class="hw-toolbar">
+                <input class="hw-search" placeholder="🔍 Filtrar..." oninput="window._hwSearch(this.value)">
+                <button class="hw-btn" onclick="window._hwRefresh()">🔄</button>
+                <button class="hw-btn hw-btn-danger" onclick="window._hwClearAttacks()">🗑️</button>
+                <button class="hw-btn hw-btn-success" onclick="window._hwTestDodge()">🧪</button>
+                <label class="hw-toggle">
+                    <input type="checkbox" ${this.CONFIG.AUTO_DODGE ? 'checked' : ''} onchange="window._hwToggleDodge(this.checked)">
+                    <span class="hw-toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="hw-attack-list">
+                <div class="hw-empty-state">
+                    <div class="hw-empty-icon">🛡️</div>
+                    <div>Nenhum ataque detectado</div>
+                </div>
+            </div>
+
+            <div class="hw-footer">
+                ⭐ Menos de ${this.CONFIG.JANELA_GRUPO}s = GRUPO | ${this.CONFIG.TEMPO_ANTECEDENCIA}s ANTES | ${this.CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        var self = this;
+
+        window._hwSearch = function(val) {
+            var items = panel.querySelectorAll('.hw-attack-item');
+            var search = val.toLowerCase();
+            for (var i = 0; i < items.length; i++) {
+                items[i].style.display = items[i].textContent.toLowerCase().indexOf(search) >= 0 ? '' : 'none';
+            }
+        };
+
+        window._hwRefresh = function() {
+            self._scanAttacks();
+            self._updatePanel();
+        };
+
+        window._hwClearAttacks = function() {
+            if (!confirm('🗑️ Limpar todos os ataques?')) return;
+            for (var key in self.dodgeState.groupTimers) {
+                clearTimeout(self.dodgeState.groupTimers[key]);
+            }
+            for (var key in self.dodgeState.returnTimers) {
+                clearTimeout(self.dodgeState.returnTimers[key]);
+            }
+            self.dodgeState.groupStatus = {};
+            self.dodgeState.groupTimers = {};
+            self.dodgeState.returnTimers = {};
+            self.dodgeState.executedGroups = {};
+            self.troopsSent = {};
+            self.attackCommands = {};
+            self._updatePanel();
+            self._log('✅ Todos os ataques foram limpos', 'success');
+        };
+
+        window._hwTestDodge = function() {
+            var towns = Object.keys(self.CIDADES);
+            if (towns.length === 0) {
+                self._log('⚠️ Nenhuma cidade configurada!', 'warning');
+                return;
+            }
+            var townId = parseInt(towns[0]);
+            var destino = self.CIDADES[townId];
+            var now = self._gameNow();
+
+            self._log(`🧪 Simulando ataques para ${townId}...`, 'info');
+
+            var tempos = [10, 11, 24, 27, 40];
+
+            var attacks = [];
+            for (var i = 0; i < tempos.length; i++) {
+                var arrival = now + tempos[i];
+                var key = 'sim_' + Date.now() + '_' + i;
+                attacks.push({
+                    cmdId: key,
+                    arrival: arrival,
+                    type: 'mixed'
+                });
+                self._log(`🧪 Ataque ${i+1} às ${new Date(arrival * 1000).toLocaleTimeString()}`, 'debug');
+            }
+
+            var cityAttacks = {};
+            cityAttacks[townId] = attacks;
+
+            self._log(`🎯 ${attacks.length} ataques simulados!`, 'attack');
+
+            var groups = [];
+            var currentGroup = [attacks[0]];
+            for (var i = 1; i < attacks.length; i++) {
+                var gap = attacks[i].arrival - attacks[i-1].arrival;
+                if (gap <= self.CONFIG.JANELA_GRUPO) {
+                    currentGroup.push(attacks[i]);
+                } else {
+                    groups.push(currentGroup);
+                    currentGroup = [attacks[i]];
+                }
+            }
+            groups.push(currentGroup);
+
+            for (var g = 0; g < groups.length; g++) {
+                var group = groups[g];
+                var firstTime = group[0].arrival;
+                var lastTime = group[group.length - 1].arrival;
+                var groupKey = townId + '_group_' + firstTime + '_' + g;
+                var isGroup = group.length > 1;
+
+                self.dodgeState.groupStatus[groupKey] = {
+                    townId: townId,
+                    destino: destino,
+                    firstTime: firstTime,
+                    lastTime: lastTime,
+                    attacks: group,
+                    isGroup: isGroup,
+                    status: 'waiting',
+                    dodged: false
+                };
+
+                var dodgeDelay = Math.max(firstTime - now - self.CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
+                setTimeout(function(data, key) {
+                    self._executeDodgeForGroup(data.townId, data.destino, data.firstTime, data.lastTime, data.attacks, key, data.isGroup);
+                }, dodgeDelay);
+            }
+
+            self._updatePanel();
+        };
+
+        window._hwToggleDodge = function(checked) {
+            self.CONFIG.AUTO_DODGE = checked;
+            self._log(`🛡️ Dodge automático: ${checked ? 'ATIVADO' : 'DESATIVADO'}`, 'info');
+        };
+
+        this._updatePanel();
+        this._log('📋 Painel aberto', 'success');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🚀 INICIALIZAÇÃO
+    // ═══════════════════════════════════════════════════════════════════════
+
     _startDodge() {
-        this.console.log('[Dodge] 🛡️ Iniciando sistema de Dodge...');
-        this.console.log('[Dodge] 🏙️ Cidades protegidas: ' + Object.keys(this.DODGE_CIDADES).join(', '));
+        this._log('🚀 Herald SO v49.2 - DENTRO DO MULTBOT!', 'info');
+        this._log('🏙️ Cidades: ' + Object.keys(this.CIDADES).join(', '), 'info');
+        this._log('📦 Ataques com menos de ' + this.CONFIG.JANELA_GRUPO + 's = GRUPO', 'group');
+        this._log('⭐ Envia ' + this.CONFIG.TEMPO_ANTECEDENCIA + 's ANTES do primeiro', 'dodge');
+        this._log('⭐ Volta ' + this.CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS o último', 'dodge');
+
+        this._addHeraldIcon();
 
         // Primeiro scan
         setTimeout(() => this._scanAttacks(), 2000);
 
         // Scan periódico
-        setInterval(() => this._scanAttacks(), this.DODGE_CONFIG.INTERVALO_REFRESH_ATAQUES * 1000);
+        setInterval(() => this._scanAttacks(), this.CONFIG.INTERVALO_REFRESH_ATAQUES * 1000);
 
-        this.console.log('[Dodge] ✅ Dodge ativo!');
+        this._log('✅ Sistema Dodge ativo!', 'success');
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // FIM DO DODGE
+    // 🛠️ MÉTODO AUXILIAR - withTownId
     // ═══════════════════════════════════════════════════════════════════════
 
-    _migrateOldPlans() {
-        let changed = false;
-        const newPlans = [];
+    async _withTownId(townId, fn) {
+        const orig = uw.Game.townId;
+        const origStr = uw.Game.town_id;
+        uw.Game.townId = parseInt(townId, 10);
+        uw.Game.town_id = parseInt(townId, 10);
 
-        for (const plan of this._plans) {
-            let migratedPlan = plan;
-
-            if (!Array.isArray(plan.units)) {
-                if (plan.unit) {
-                    changed = true;
-                    migratedPlan = {
-                        id: plan.id,
-                        originId: plan.originId,
-                        units: [
-                            {
-                                unit: plan.unit,
-                                quantity: plan.quantity,
-                                isNaval: !!plan.isNaval,
-                                useMax: false
-                            }
-                        ],
-                        targets: plan.targets || [],
-                        enabled: plan.enabled !== false
-                    };
-                    this.console.log('[AutoAttack] Plano antigo migrado: cidade #' + plan.originId + ' (' + plan.unit + ' x' + plan.quantity + ').');
-                } else {
-                    changed = true;
-                    this.console.log('[AutoAttack] Aviso: plano invalido removido (sem unidades definidas).');
-                    continue;
-                }
-            }
-
-            if (typeof migratedPlan.restMinutes !== 'number') {
-                migratedPlan.restMinutes = 0;
-                changed = true;
-            }
-            if (!migratedPlan.nextAllowedAt || typeof migratedPlan.nextAllowedAt !== 'object') {
-                migratedPlan.nextAllowedAt = {};
-                changed = true;
-            }
-
-            if (Array.isArray(migratedPlan.units)) {
-                for (const u of migratedPlan.units) {
-                    if (typeof u.useMax !== 'boolean') {
-                        u.useMax = false;
-                        changed = true;
-                    }
-                }
-            }
-
-            if (typeof migratedPlan.hero === 'undefined') {
-                migratedPlan.hero = null;
-                changed = true;
-            }
-
-            newPlans.push(migratedPlan);
-        }
-
-        this._plans = newPlans;
-
-        if (changed) {
-            this.storage.save('attack_plans', this._plans);
-        }
-    }
-
-    _getUnitLabel(unitId) {
-        return this.getGameName('unit', unitId);
-    }
-
-    _getHeroLabel(heroId) {
-        if (!heroId) return '';
         try {
-            return this.getGameName('hero', heroId);
-        } catch (e) {
-            try {
-                return uw.GameData.heroes[heroId].name;
-            } catch (e2) {
-                return heroId;
-            }
+            const result = await fn();
+            return result;
+        } finally {
+            uw.Game.townId = orig;
+            uw.Game.town_id = origStr;
         }
     }
 
-    _formatUnitEntry(u) {
-        const label = this._getUnitLabel(u.unit);
-        if (u.useMax) return 'MAX x ' + label;
-        return u.quantity + 'x ' + label;
-    }
+    // ═══════════════════════════════════════════════════════════════════════
+    // 📋 ADICIONAR AO PAINEL DO MULTBOT (opcional)
+    // ═══════════════════════════════════════════════════════════════════════
 
-    settings = () => {
-        const self = this;
-        requestAnimationFrame(function () {
-            self._updateTitle();
-            self._renderPlans();
-            self._renderStagingUnits();
-            self._updateDodgePanel();
-        });
-
+    settings() {
+        // Retorna HTML para o painel do MultBot (configuração de cidades)
         let html = '';
-        html += '<div class="game_border" style="margin-bottom:14px;">';
-        html += '<div class="game_border_top"></div><div class="game_border_bottom"></div>';
-        html += '<div class="game_border_left"></div><div class="game_border_right"></div>';
-        html += '<div class="game_border_corner corner1"></div><div class="game_border_corner corner2"></div>';
-        html += '<div class="game_border_corner corner3"></div><div class="game_border_corner corner4"></div>';
-        html += this.getTitleHtml('attack_title', '⚔️ Auto Ataque + 🛡️ Dodge', this.toggle, '', this._active);
-
-        // ═══ DODGE PANEL ═══
-        html += '<div style="padding:4px 10px;border-bottom:1px solid rgba(0,0,0,0.15);">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-        html += '<span style="font-weight:bold;font-size:11px;">🛡️ Dodge <span id="dodge_counter" style="color:#888;">0</span></span>';
-        html += '<span style="font-size:9px;color:#666;">' + Object.keys(this.DODGE_CIDADES).length + ' cidades protegidas</span>';
-        html += '</div>';
-        html += '<div id="dodge_panel_container" style="font-size:11px;max-height:200px;overflow-y:auto;margin:4px 0;"></div>';
-        html += '<div style="display:flex;gap:4px;margin:4px 0;flex-wrap:wrap;">';
-        html += this.getButtonHtml('dodge_add_cidade', '+ Adicionar Cidade', this._dodgeAddCidade);
-        html += this.getButtonHtml('dodge_refresh', '🔄 Atualizar', this._dodgeRefresh);
-        html += this.getButtonHtml('dodge_clear', '🗑️ Limpar', this._dodgeClear);
-        html += '</div>';
+        html += '<div style="padding:4px 10px;">';
+        html += '<div style="font-weight:bold;font-size:11px;margin:4px 0;">🛡️ Dodge - Cidades Protegidas</div>';
         html += '<div style="display:flex;gap:4px;margin:4px 0;flex-wrap:wrap;align-items:center;">';
         html += '<label style="font-size:10px;">Cidade atacada:</label>';
         html += '<select id="dodge_attack_cidade" style="padding:2px;font-size:10px;">';
@@ -738,142 +1242,12 @@ var AutoAttack = class extends MultUtil {
         html += '<select id="dodge_support_cidade" style="padding:2px;font-size:10px;">';
         html += this._getTownOptionsHtml();
         html += '</select>';
+        html += this.getButtonHtml('dodge_add_btn', '+ Adicionar', this._addCidade);
         html += '</div>';
+        html += '<div style="font-size:10px;color:#666;">Cidades configuradas: ' + Object.keys(this.CIDADES).length + '</div>';
         html += '</div>';
-
-        // ═══ AUTO ATTACK PANEL ═══
-        html += '<div style="padding:4px 10px;">';
-        html += '<div style="font-weight:bold;font-size:11px;margin:4px 0;">⚔️ Planos de Ataque</div>';
-
-        html += '<div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">';
-        html += '<div style="flex:1; min-width:180px;">';
-        html += '<label style="font-size:11px;font-weight:bold;">Cidade Atacante</label><br>';
-        html += '<select id="attack_origin_select" style="width:100%;padding:3px;">';
-        html += this._getTownOptionsHtml();
-        html += '</select>';
-        html += '</div>';
-        html += '<div style="width:140px;">';
-        html += '<label style="font-size:11px;font-weight:bold;" title="Espera antes de reatacar o mesmo alvo, +-10% de variacao. 0 = sem espera.">Descanso (min)</label><br>';
-        html += '<input type="number" id="attack_rest_minutes" min="0" placeholder="0" style="width:100%;padding:3px;" value="0">';
-        html += '</div>';
-        html += '</div>';
-
-        html += '<div style="display:flex; gap:10px; align-items:flex-end; margin-top:6px; flex-wrap:wrap;">';
-        html += '<div style="flex:1; min-width:180px;">';
-        html += '<label style="font-size:11px;font-weight:bold;" title="Opcional. Envia esse heroi junto com o ataque, se ele estiver disponivel na cidade atacante no momento do disparo.">Heroi (opcional)</label><br>';
-        html += '<select id="attack_hero_select" style="width:100%;padding:3px;">';
-        html += this._getHeroOptionsHtml();
-        html += '</select>';
-        html += '</div>';
-        html += '</div>';
-
-        html += '<div style="display:flex; gap:8px; align-items:flex-end; margin-top:6px; flex-wrap:wrap;">';
-        html += '<div style="flex:1; min-width:130px;">';
-        html += '<label style="font-size:11px;font-weight:bold;">Unidade</label><br>';
-        html += '<select id="attack_unit_select" style="width:100%;padding:3px;">';
-        html += this._getUnitOptionsHtml();
-        html += '</select>';
-        html += '</div>';
-        html += '<div style="width:75px;">';
-        html += '<label style="font-size:11px;font-weight:bold;">Qtde</label><br>';
-        html += '<input type="number" id="attack_qty" min="1" placeholder="100" style="width:100%;padding:3px;">';
-        html += '</div>';
-        html += '<div style="width:60px;">';
-        html += '<label style="font-size:11px;font-weight:bold;" title="Sempre envia TUDO que estiver disponivel dessa unidade no momento do ataque.">&nbsp;</label><br>';
-        html += '<label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;padding:4px 0;">';
-        html += '<input type="checkbox" id="attack_qty_max" onchange="window.multBot.autoAttack.toggleMaxQty()"> Max';
-        html += '</label>';
-        html += '</div>';
-        html += '<div>';
-        html += this.getButtonHtml('attack_add_unit_btn', '+ Unidade', this.addUnitToStaging);
-        html += '</div>';
-        html += '</div>';
-
-        html += '<div id="attack_staging_list" style="font-size:11px; margin-top:4px;"></div>';
-
-        html += '<div style="margin-top:6px;">';
-        html += '<label style="font-size:11px;font-weight:bold;">Cidades-alvo (ID, separadas por virgula ou linha)</label>';
-        html += '<textarea id="attack_targets" rows="1" style="width:100%;padding:4px;box-sizing:border-box;" placeholder="ex: 12345, 67890"></textarea>';
-        html += '</div>';
-
-        html += '<div style="margin-top:6px;">';
-        html += this.getButtonHtml('attack_add_plan_btn', '+ Adicionar Plano', this.addPlan);
-        html += '</div>';
-        html += '</div>';
-
-        html += '<div style="padding:4px 10px 8px;border-top:1px solid rgba(0,0,0,0.15);">';
-        html += '<div style="font-weight:bold;font-size:11px;margin:4px 0;">Planos ativos:</div>';
-        html += '<div id="attack_plans_list" style="';
-        html += 'max-height:' + this.PLANS_LIST_MAX_HEIGHT + 'px;';
-        html += 'overflow-y:scroll;';
-        html += 'overflow-x:hidden;';
-        html += 'border:1px solid #7a5c2a;';
-        html += 'border-radius:3px;';
-        html += 'background:rgba(255,255,255,0.35);';
-        html += 'padding:3px 5px;';
-        html += 'box-sizing:border-box;';
-        html += '"></div>';
-        html += '</div>';
-
-        html += '<div id="attack_log" style="padding:0 10px 6px;font-size:11px;color:#5a3a0a;min-height:14px;"></div>';
-        html += '</div>';
-
         return html;
-    };
-
-    // ═══ MÉTODOS DO DODGE ═══
-
-    _dodgeAddCidade = () => {
-        const atacada = uw.$('#dodge_attack_cidade').val();
-        const suporte = uw.$('#dodge_support_cidade').val();
-
-        if (!atacada || !suporte) {
-            this.console.log('[Dodge] Erro: selecione ambas as cidades.');
-            uw.$('#attack_log').text('Erro: selecione cidade atacada e cidade de suporte.').css('color', '#f87171');
-            return;
-        }
-
-        if (atacada === suporte) {
-            this.console.log('[Dodge] Erro: a cidade atacada não pode ser a mesma que envia suporte.');
-            uw.$('#attack_log').text('Erro: cidades devem ser diferentes.').css('color', '#f87171');
-            return;
-        }
-
-        this.DODGE_CIDADES[atacada] = suporte;
-        this.storage.save('dodge_cidades', this.DODGE_CIDADES);
-        this.console.log('[Dodge] ✅ Cidade adicionada: ' + atacada + ' → ' + suporte);
-        uw.$('#attack_log').text('Cidade adicionada: ' + atacada + ' → ' + suporte).css('color', '#1a6b2a');
-
-        this._updateDodgePanel();
-        this._scanAttacks();
-    };
-
-    _dodgeRefresh = () => {
-        this._scanAttacks();
-        this.console.log('[Dodge] 🔄 Scan manual executado');
-        uw.$('#attack_log').text('Scan atualizado!').css('color', '#1a6b2a');
-    };
-
-    _dodgeClear = () => {
-        if (!confirm('🗑️ Limpar todos os ataques detectados?')) return;
-        for (var key in this.dodgeState.groupTimers) {
-            clearTimeout(this.dodgeState.groupTimers[key]);
-        }
-        for (var key in this.dodgeState.returnTimers) {
-            clearTimeout(this.dodgeState.returnTimers[key]);
-        }
-        this.dodgeState.groupStatus = {};
-        this.dodgeState.groupTimers = {};
-        this.dodgeState.returnTimers = {};
-        this.dodgeState.executedGroups = {};
-        this.troopsSent = {};
-        this.attackCommands = {};
-        this._updateDodgePanel();
-        this.console.log('[Dodge] ✅ Todos os ataques foram limpos');
-        uw.$('#attack_log').text('Ataques limpos!').css('color', '#1a6b2a');
-    };
-
-    // ═══ MÉTODOS EXISTENTES DO AUTOATTACK ═══
+    }
 
     _getTownOptionsHtml() {
         try {
@@ -898,498 +1272,25 @@ var AutoAttack = class extends MultUtil {
         }
     }
 
-    _getUnitOptionsHtml() {
-        try {
-            const units = uw.GameData.units;
-            const keys = Object.keys(units).filter(function (u) {
-                return u !== 'militia';
-            });
+    _addCidade = () => {
+        const atacada = uw.$('#dodge_attack_cidade').val();
+        const suporte = uw.$('#dodge_support_cidade').val();
 
-            const self = this;
-            const items = keys.map(function (key) {
-                return { id: key, label: self._getUnitLabel(key), isNaval: !!units[key].is_naval };
-            });
-
-            items.sort(function (a, b) {
-                return a.label.localeCompare(b.label);
-            });
-
-            let html = '<option value="">Selecione...</option>';
-            for (const item of items) {
-                const typeTag = item.isNaval ? ' (naval)' : ' (terra)';
-                html += '<option value="' + item.id + '">' + item.label + typeTag + '</option>';
-            }
-            return html;
-        } catch (e) {
-            return '<option value="">Erro ao carregar unidades</option>';
+        if (!atacada || !suporte) {
+            this.console.log('[Dodge] Erro: selecione ambas as cidades.');
+            return;
         }
-    }
 
-    _getHeroOptionsHtml() {
-        try {
-            const heroes = uw.GameData.heroes;
-            const keys = Object.keys(heroes);
-
-            const self = this;
-            const items = keys.map(function (key) {
-                return { id: key, label: self._getHeroLabel(key) || key };
-            });
-
-            items.sort(function (a, b) {
-                return a.label.localeCompare(b.label);
-            });
-
-            let html = '<option value="">Nenhum</option>';
-            for (const item of items) {
-                html += '<option value="' + item.id + '">' + item.label + '</option>';
-            }
-            return html;
-        } catch (e) {
-            return '<option value="">Nenhum</option>';
+        if (atacada === suporte) {
+            this.console.log('[Dodge] Erro: a cidade atacada não pode ser a mesma que envia suporte.');
+            return;
         }
-    }
 
-    toggleMaxQty = () => {
-        const checked = uw.$('#attack_qty_max').is(':checked');
-        const $qty = uw.$('#attack_qty');
-        if (checked) {
-            $qty.prop('disabled', true).val('');
-        } else {
-            $qty.prop('disabled', false);
-        }
+        this.CIDADES[atacada] = suporte;
+        this.storage.save('dodge_cidades', this.CIDADES);
+        this.console.log('[Dodge] ✅ Cidade adicionada: ' + atacada + ' → ' + suporte);
+
+        this._updatePanel();
+        this._scanAttacks();
     };
-
-    addUnitToStaging = () => {
-        const unit = uw.$('#attack_unit_select').val();
-        const useMax = uw.$('#attack_qty_max').is(':checked');
-        const qty = parseInt(uw.$('#attack_qty').val(), 10);
-
-        if (!unit) {
-            this.console.log('[AutoAttack] Erro: selecione uma unidade antes de adicionar.');
-            uw.$('#attack_log').text('Erro: selecione uma unidade.').css('color', '#f87171');
-            return;
-        }
-        if (!useMax && (!qty || qty <= 0)) {
-            this.console.log('[AutoAttack] Erro: quantidade invalida.');
-            uw.$('#attack_log').text('Erro: informe uma quantidade valida ou marque Max.').css('color', '#f87171');
-            return;
-        }
-
-        const unitData = uw.GameData.units[unit];
-        const isNaval = unitData && unitData.is_naval ? true : false;
-
-        let existing = null;
-        for (const u of this._stagingUnits) {
-            if (u.unit === unit) {
-                existing = u;
-                break;
-            }
-        }
-
-        if (existing) {
-            if (useMax) {
-                existing.useMax = true;
-                existing.quantity = 0;
-            } else if (existing.useMax) {
-                existing.useMax = false;
-                existing.quantity = qty;
-            } else {
-                existing.quantity += qty;
-            }
-        } else {
-            this._stagingUnits.push({
-                unit: unit,
-                quantity: useMax ? 0 : qty,
-                isNaval: isNaval,
-                useMax: useMax
-            });
-        }
-
-        uw.$('#attack_qty').val('').prop('disabled', false);
-        uw.$('#attack_qty_max').prop('checked', false);
-        uw.$('#attack_unit_select').val('');
-
-        this._renderStagingUnits();
-
-        const entryForLog = existing ? existing : this._stagingUnits[this._stagingUnits.length - 1];
-        this.console.log('[AutoAttack] Unidade adicionada a composicao: ' + this._formatUnitEntry(entryForLog));
-    };
-
-    removeStagingUnit = (unit) => {
-        this._stagingUnits = this._stagingUnits.filter(function (u) {
-            return u.unit !== unit;
-        });
-        this._renderStagingUnits();
-    };
-
-    _renderStagingUnits() {
-        const container = uw.$('#attack_staging_list');
-        if (!container.length) return;
-
-        if (this._stagingUnits.length === 0) {
-            container.html('<span style="color:#7a5c2a;">Nenhuma unidade na composicao ainda.</span>');
-            return;
-        }
-
-        let html = '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
-        for (const u of this._stagingUnits) {
-            html += '<span style="background:rgba(0,0,0,0.08);border-radius:3px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px;">';
-            html += this._formatUnitEntry(u);
-            html += '<span onclick="window.multBot.autoAttack.removeStagingUnit(\'' + u.unit + '\')" style="cursor:pointer;color:#f87171;font-weight:bold;">X</span>';
-            html += '</span>';
-        }
-        html += '</div>';
-        container.html(html);
-    }
-
-    toggle = () => {
-        if (this._active) {
-            this.stop();
-        } else {
-            this.start();
-        }
-    };
-
-    start() {
-        if (this._active) return;
-        this._active = true;
-        this.storage.save('attack_active', true);
-        this._updateTitle();
-        this.console.log('[AutoAttack] Iniciado. Monitorando planos de ataque...');
-        this._tick();
-        this._intervalId = this.createGuardedInterval(() => this._tick(), this.CHECK_INTERVAL_MS);
-    }
-
-    stop() {
-        this._active = false;
-        this.storage.save('attack_active', false);
-        if (this._intervalId) {
-            clearInterval(this._intervalId);
-            this._intervalId = null;
-        }
-        this._updateTitle();
-        this.console.log('[AutoAttack] Parado.');
-    }
-
-    _updateTitle() {
-        const filter = this._active ? 'brightness(100%) saturate(186%) hue-rotate(241deg)' : '';
-        uw.$('#attack_title').css('filter', filter);
-    }
-
-    addPlan = () => {
-        const originId = (uw.$('#attack_origin_select').val() || '').trim();
-        const targetsRaw = (uw.$('#attack_targets').val() || '').trim();
-        const restMinutesRaw = parseInt(uw.$('#attack_rest_minutes').val(), 10);
-        const restMinutes = (!isNaN(restMinutesRaw) && restMinutesRaw > 0) ? restMinutesRaw : 0;
-        const hero = (uw.$('#attack_hero_select').val() || '').trim() || null;
-
-        if (!originId) {
-            this.console.log('[AutoAttack] Erro: nenhuma cidade atacante selecionada.');
-            uw.$('#attack_log').text('Erro: selecione uma cidade atacante.').css('color', '#f87171');
-            return;
-        }
-        if (this._stagingUnits.length === 0) {
-            this.console.log('[AutoAttack] Erro: adicione ao menos uma unidade a composicao.');
-            uw.$('#attack_log').text('Erro: adicione ao menos uma unidade.').css('color', '#f87171');
-            return;
-        }
-
-        const rawTargets = targetsRaw.split(/[\n,]+/);
-        const targets = [];
-        for (const t of rawTargets) {
-            const trimmed = t.trim();
-            if (/^\d+$/.test(trimmed)) targets.push(trimmed);
-        }
-
-        if (targets.length === 0) {
-            this.console.log('[AutoAttack] Erro: nenhuma cidade-alvo valida informada.');
-            uw.$('#attack_log').text('Erro: informe pelo menos uma cidade-alvo valida.').css('color', '#f87171');
-            return;
-        }
-
-        const unitsCopy = [];
-        for (const u of this._stagingUnits) {
-            unitsCopy.push({ unit: u.unit, quantity: u.quantity, isNaval: u.isNaval, useMax: u.useMax });
-        }
-
-        const plan = {
-            id: Date.now() + '_' + Math.floor(Math.random() * 10000),
-            originId: originId,
-            units: unitsCopy,
-            targets: targets,
-            restMinutes: restMinutes,
-            nextAllowedAt: {},
-            hero: hero,
-            enabled: true
-        };
-
-        this._plans.push(plan);
-        this.storage.save('attack_plans', this._plans);
-        this._renderPlans();
-
-        this._stagingUnits = [];
-        this._renderStagingUnits();
-        uw.$('#attack_origin_select').val('');
-        uw.$('#attack_targets').val('');
-        uw.$('#attack_rest_minutes').val('0');
-        uw.$('#attack_hero_select').val('');
-
-        const originTown = uw.ITowns.towns[originId];
-        const originName = originTown && originTown.getName ? originTown.getName() : ('#' + originId);
-
-        let unitsSummary = '';
-        for (let i = 0; i < plan.units.length; i++) {
-            if (i > 0) unitsSummary += ', ';
-            unitsSummary += this._formatUnitEntry(plan.units[i]);
-        }
-
-        const restLabel = restMinutes > 0 ? (', descanso ' + restMinutes + 'min') : '';
-        const heroLabel = hero ? (', heroi: ' + this._getHeroLabel(hero)) : '';
-        this.console.log('[AutoAttack] Plano adicionado: ' + originName + ' [' + unitsSummary + '] -> ' + targets.length + ' alvo(s)' + restLabel + heroLabel + '.');
-        uw.$('#attack_log').text('Plano adicionado com sucesso!').css('color', '#1a6b2a');
-    };
-
-    removePlan = (planId) => {
-        this._plans = this._plans.filter(function (p) {
-            return p.id !== planId;
-        });
-        this.storage.save('attack_plans', this._plans);
-        this._renderPlans();
-        this.console.log('[AutoAttack] Plano removido.');
-    };
-
-    _renderPlans() {
-        const container = uw.$('#attack_plans_list');
-        if (!container.length) return;
-
-        if (this._plans.length === 0) {
-            container.html('<span style="font-size:11px;color:#7a5c2a;">Nenhum plano configurado.</span>');
-            return;
-        }
-
-        let html = '';
-
-        for (const plan of this._plans) {
-            if (!Array.isArray(plan.units)) continue;
-
-            const townName = this.getTownName(plan.originId);
-
-            let unitsLabel = '';
-            for (let i = 0; i < plan.units.length; i++) {
-                if (i > 0) unitsLabel += ', ';
-                unitsLabel += this._formatUnitEntry(plan.units[i]);
-            }
-
-            if (plan.hero) {
-                unitsLabel += ' + heroi ' + this._getHeroLabel(plan.hero);
-            }
-
-            let targetsLabel = '';
-            for (let i = 0; i < plan.targets.length; i++) {
-                if (i > 0) targetsLabel += ', ';
-                targetsLabel += this.getTownName(plan.targets[i]);
-
-                const nextAt = plan.nextAllowedAt ? plan.nextAllowedAt[plan.targets[i]] : null;
-                if (nextAt && nextAt > Date.now()) {
-                    const remainMin = Math.ceil((nextAt - Date.now()) / 60000);
-                    targetsLabel += '(' + remainMin + 'min)';
-                }
-            }
-
-            const restLabel = (plan.restMinutes && plan.restMinutes > 0) ? (' | ' + plan.restMinutes + 'min') : '';
-
-            html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 2px;border-bottom:1px solid rgba(0,0,0,0.08);font-size:10px;line-height:1.3;">';
-            html += '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:6px;" title="' + townName + ' [' + unitsLabel + '] -> ' + targetsLabel + restLabel + '">';
-            html += '<b>' + townName + '</b> [' + unitsLabel + '] &rarr; ' + targetsLabel + restLabel;
-            html += '</div>';
-            html += '<span onclick="window.multBot.autoAttack.removePlan(\'' + plan.id + '\')" style="cursor:pointer;color:#f87171;font-weight:bold;flex-shrink:0;padding:0 4px;">X</span>';
-            html += '</div>';
-        }
-
-        container.html(html);
-    }
-
-    async _tick() {
-        if (window.__multbot_captcha_active) return;
-        if (this._plans.length === 0) return;
-
-        const promises = [];
-        for (const plan of this._plans) {
-            if (!plan.enabled) continue;
-            promises.push(this._checkAndFire(plan));
-        }
-
-        await Promise.all(promises);
-    }
-
-    _computeNextAllowedAt(restMinutes) {
-        const baseMs = restMinutes * 60 * 1000;
-        const jitterRange = baseMs * this.JITTER_PERCENT;
-        const jitter = (Math.random() * 2 - 1) * jitterRange;
-        return Date.now() + baseMs + jitter;
-    }
-
-    async _checkAndFire(plan) {
-        try {
-            if (!Array.isArray(plan.units) || plan.units.length === 0) {
-                this.console.log('[AutoAttack] Aviso: plano da cidade #' + plan.originId + ' sem composicao valida, ignorado.');
-                return;
-            }
-
-            const town = uw.ITowns.towns[plan.originId];
-            if (!town) {
-                this.console.log('[AutoAttack] Aviso: cidade #' + plan.originId + ' nao encontrada (nao e sua ou saiu do cache).');
-                return;
-            }
-
-            const available = town.units();
-
-            let hasMissing = false;
-            for (const u of plan.units) {
-                const have = available[u.unit] || 0;
-                const required = u.useMax ? 1 : u.quantity;
-                if (have < required) {
-                    hasMissing = true;
-                    break;
-                }
-            }
-            if (hasMissing) return;
-
-            if (!plan.nextAllowedAt) plan.nextAllowedAt = {};
-
-            const now = Date.now();
-
-            const readyTargets = [];
-            for (const targetId of plan.targets) {
-                const nextAt = plan.nextAllowedAt[targetId];
-                if (nextAt && nextAt > now) continue;
-                readyTargets.push(targetId);
-            }
-
-            if (readyTargets.length === 0) {
-                return;
-            }
-
-            const townName = town.getName ? town.getName() : ('#' + plan.originId);
-
-            let unitsSummary = '';
-            for (let i = 0; i < plan.units.length; i++) {
-                if (i > 0) unitsSummary += ', ';
-                unitsSummary += this._formatUnitEntry(plan.units[i]);
-            }
-
-            this.console.log('[AutoAttack] ' + townName + ': composicao completa disponivel [' + unitsSummary + ']. Disparando ataques em ' + readyTargets.length + ' alvo(s) prontos...');
-
-            const remaining = {};
-            for (const u of plan.units) {
-                remaining[u.unit] = available[u.unit] || 0;
-            }
-
-            let heroAlreadySent = false;
-
-            for (const targetId of readyTargets) {
-                let stillEnough = true;
-                for (const u of plan.units) {
-                    const required = u.useMax ? 1 : u.quantity;
-                    if (remaining[u.unit] < required) {
-                        stillEnough = false;
-                        break;
-                    }
-                }
-                if (!stillEnough) {
-                    this.console.log('[AutoAttack] ' + townName + ': composicao insuficiente para continuar aos proximos alvos.');
-                    break;
-                }
-
-                const sendUnits = [];
-                for (const u of plan.units) {
-                    const qtyToSend = u.useMax ? remaining[u.unit] : u.quantity;
-                    sendUnits.push({ unit: u.unit, quantity: qtyToSend });
-                }
-
-                let sendSummary = '';
-                for (let i = 0; i < sendUnits.length; i++) {
-                    if (i > 0) sendSummary += ', ';
-                    sendSummary += sendUnits[i].quantity + 'x ' + this._getUnitLabel(sendUnits[i].unit);
-                }
-
-                const heroForThisSend = (plan.hero && !heroAlreadySent) ? plan.hero : null;
-                if (heroForThisSend) {
-                    sendSummary += ' + heroi ' + this._getHeroLabel(heroForThisSend);
-                }
-
-                const targetName = this.getTownName(targetId);
-                try {
-                    await this._sendAttack(plan.originId, targetId, sendUnits, heroForThisSend);
-                    if (heroForThisSend) heroAlreadySent = true;
-                    this.console.log('[AutoAttack] OK: ' + townName + ' -> ' + targetName + ': ataque com [' + sendSummary + '] enviado!');
-                    uw.$('#attack_log').text('OK: ' + townName + ' atacou ' + targetName + ' [' + sendSummary + ']').css('color', '#1a6b2a');
-                    if (uw.HumanMessage) {
-                        uw.HumanMessage.success('MultBot: ' + townName + ' -> ' + targetName + ' (ataque)');
-                    }
-
-                    for (const u of plan.units) {
-                        if (u.useMax) {
-                            remaining[u.unit] = 0;
-                        } else {
-                            remaining[u.unit] -= u.quantity;
-                        }
-                    }
-
-                    if (plan.restMinutes && plan.restMinutes > 0) {
-                        const nextAllowed = this._computeNextAllowedAt(plan.restMinutes);
-                        plan.nextAllowedAt[targetId] = nextAllowed;
-                        this.storage.save('attack_plans', this._plans);
-
-                        const remainMin = Math.round((nextAllowed - Date.now()) / 60000);
-                        this.console.log('[AutoAttack] ' + targetName + ' entrando em descanso por aproximadamente ' + remainMin + 'min.');
-                    }
-                } catch (e) {
-                    const msg = e && e.message ? e.message : e;
-                    this.console.log('[AutoAttack] FALHA ao atacar ' + targetName + ' de ' + townName + ': ' + msg);
-                    uw.$('#attack_log').text('Falha ao atacar ' + targetName + ': ' + msg).css('color', '#f87171');
-                }
-
-                await this.sleep(this.SEND_DELAY_MS);
-            }
-        } catch (e) {
-            const msg = e && e.message ? e.message : e;
-            this.console.log('[AutoAttack] Erro ao processar plano da cidade #' + plan.originId + ': ' + msg);
-        }
-    }
-
-    _sendAttack(fromTownId, toTownId, unitsList, heroKey) {
-        return this._withTownId(fromTownId, () => {
-            const data = {
-                id: parseInt(toTownId, 10),
-                type: 'attack',
-                nl_init: true
-            };
-
-            for (const u of unitsList) {
-                data[u.unit] = u.quantity;
-            }
-
-            if (heroKey) {
-                data.heroes = heroKey;
-            }
-
-            return this.ajaxPostWithTimeout('town_info', 'send_units', data, 15000);
-        });
-    }
-
-    async _withTownId(townId, fn) {
-        const orig = uw.Game.townId;
-        const origStr = uw.Game.town_id;
-        uw.Game.townId = parseInt(townId, 10);
-        uw.Game.town_id = parseInt(townId, 10);
-
-        try {
-            const result = await fn();
-            return result;
-        } finally {
-            uw.Game.townId = orig;
-            uw.Game.town_id = origStr;
-        }
-    }
 };

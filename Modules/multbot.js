@@ -180,12 +180,11 @@ var MultBot = class {
     setup = () => {
         if (this.settingsFactory) this.settingsFactory.activate();
 
-        // ═══ ÍCONE DO MULTBOT - BANDEIRA COM BRILHO DOURADO ═══
+        // ═══ ÍCONE DO MULTBOT - LETRA "N" EM BRANCO ═══
         uw.$('.gods_area_buttons').append(`
             <div class='circle_button mult_bot_settings' onclick='window.multBot.settingsFactory.openWindow()'>
-                <div style='width: 27px; height: 27px; display:flex; align-items:center; justify-content:center;' class='icon js-caption' title='MultBot'>
-                    <img src="https://gpit.innogamescdn.com/images/game/icon_save_location.png" width="23" height="23"
-                         style="display:block; box-sizing:border-box; border-radius:50%; object-fit:contain; border:2px solid #fdcb6e; box-shadow:0 0 12px rgba(253,203,110,0.6), 0 0 25px rgba(253,203,110,0.2);">
+                <div style='width: 27px; height: 27px; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:bold; color:#ffffff; text-shadow:0 0 12px rgba(255,255,255,0.3), 0 0 25px rgba(255,255,255,0.1);' class='icon js-caption' title='MultBot'>
+                    N
                 </div>
             </div>
         `);

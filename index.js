@@ -36,7 +36,7 @@
     }
     uw.__multbot_index_running__ = true;
 
-    const BASE_URL = 'https://raw.githubusercontent.com/gredfc/MultBot/main/Modules';
+    const BASE_URL = 'https://raw.githubusercontent.com/gredfc/vinho/main/Modules';
     const MAX_RETRIES = 2;
     const FETCH_TIMEOUT_MS = 15000;
 

@@ -180,11 +180,12 @@ var MultBot = class {
     setup = () => {
         if (this.settingsFactory) this.settingsFactory.activate();
 
-        // ═══ ÍCONE DO MULTBOT - ALTERADO PARA LETRA "H" ═══
+        // ═══ ÍCONE DO MULTBOT - ENGRENAGEM DOURADA ═══
         uw.$('.gods_area_buttons').append(`
             <div class='circle_button mult_bot_settings' onclick='window.multBot.settingsFactory.openWindow()'>
-                <div style='width: 27px; height: 27px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:bold; color:#a29bfe; text-shadow:0 0 10px rgba(162,155,254,0.3);' class='icon js-caption' title='MultBot - Herald'>
-                    H
+                <div style='width: 27px; height: 27px; display:flex; align-items:center; justify-content:center;' class='icon js-caption' title='MultBot'>
+                    <img src="https://gpit.innogamescdn.com/images/game/icon_gear.png" width="23" height="23"
+                         style="display:block; box-sizing:border-box; border-radius:50%; object-fit:contain; border:1px solid rgba(212,175,55,0.3); box-shadow:0 0 8px rgba(212,175,55,0.3);">
                 </div>
             </div>
         `);

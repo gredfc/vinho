@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════
 //  MODULE: AutoDodge - Dodge Ultimate V49.2
-//  Substitui o módulo "Auto Attack" na aba Ataque
+//  Painel flutuante dentro da aba Ataque
 // ══════════════════════════════════════════════════════
 
 (function() {
@@ -33,6 +33,387 @@
     };
 
     // ═══════════════════════════════════════════════════════════════════════
+    // 🎨 CSS DO PAINEL (adaptado para dentro da aba)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    var estiloPainel = `
+        <style>
+            #herald-panel-inline {
+                width: 100%;
+                background: #1a1a2e;
+                border: 1px solid #333;
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+                font-family: 'Segoe UI', Arial, sans-serif;
+                color: #eee;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            #herald-panel-inline .hw-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 16px;
+                background: #16213e;
+                border-bottom: 1px solid #333;
+                flex-shrink: 0;
+            }
+            #herald-panel-inline .hw-title {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 14px;
+                font-weight: 700;
+                color: #a29bfe;
+            }
+            #herald-panel-inline .hw-controls {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            #herald-panel-inline .hw-close {
+                color: #888;
+                font-size: 18px;
+                cursor: pointer;
+                padding: 0 8px;
+                background: none;
+                border: none;
+            }
+            #herald-panel-inline .hw-close:hover { color: #ff6b6b; }
+            #herald-panel-inline .hw-toolbar {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+                padding: 8px 12px;
+                background: #0f0f1a;
+                border-bottom: 1px solid #333;
+                flex-shrink: 0;
+                align-items: center;
+            }
+            #herald-panel-inline .hw-toolbar .hw-search {
+                flex: 1;
+                min-width: 80px;
+                background: #222;
+                color: #eee;
+                border: 1px solid #444;
+                border-radius: 6px;
+                padding: 4px 10px;
+                font-size: 11px;
+                outline: none;
+            }
+            #herald-panel-inline .hw-toolbar .hw-search:focus {
+                border-color: #6c5ce7;
+            }
+            #herald-panel-inline .hw-toolbar .hw-counter {
+                font-size: 11px;
+                color: #888;
+                padding: 4px 10px;
+                background: #222;
+                border-radius: 6px;
+                white-space: nowrap;
+            }
+            #herald-panel-inline .hw-toolbar .hw-counter .hw-count {
+                color: #a29bfe;
+                font-weight: 700;
+            }
+            #herald-panel-inline .hw-toolbar .hw-counter .hw-count.hw-count-danger {
+                color: #ff6b6b;
+            }
+            #herald-panel-inline .hw-toolbar .hw-btn {
+                background: #222;
+                color: #aaa;
+                border: 1px solid #444;
+                border-radius: 6px;
+                padding: 4px 10px;
+                font-size: 10px;
+                cursor: pointer;
+            }
+            #herald-panel-inline .hw-toolbar .hw-btn:hover {
+                border-color: #6c5ce7;
+                color: #fff;
+            }
+            #herald-panel-inline .hw-toolbar .hw-btn.hw-btn-danger {
+                background: #ff6b6b;
+                color: #fff;
+                border: none;
+            }
+            #herald-panel-inline .hw-toolbar .hw-btn.hw-btn-success {
+                background: #00b894;
+                color: #fff;
+                border: none;
+            }
+            #herald-panel-inline .hw-attack-list {
+                flex: 1;
+                overflow-y: auto;
+                padding: 8px 12px;
+                min-height: 100px;
+                max-height: 400px;
+            }
+            #herald-panel-inline .hw-attack-list::-webkit-scrollbar {
+                width: 4px;
+            }
+            #herald-panel-inline .hw-attack-list::-webkit-scrollbar-thumb {
+                background: #6c5ce7;
+                border-radius: 4px;
+            }
+            #herald-panel-inline .hw-empty-state {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                min-height: 80px;
+                color: #666;
+                font-size: 12px;
+                text-align: center;
+            }
+            #herald-panel-inline .hw-empty-state .hw-empty-icon {
+                font-size: 28px;
+                margin-bottom: 6px;
+                opacity: 0.5;
+            }
+            #herald-panel-inline .hw-attack-item {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 6px 10px;
+                padding: 8px 12px;
+                margin: 3px 0;
+                background: rgba(255,255,255,0.03);
+                border: 1px solid rgba(255,255,255,0.06);
+                border-radius: 8px;
+                font-size: 12px;
+            }
+            #herald-panel-inline .hw-attack-item.hw-dodged {
+                border-color: rgba(0, 184, 148, 0.3);
+                background: rgba(0, 184, 148, 0.05);
+            }
+            #herald-panel-inline .hw-attack-item.hw-group {
+                border-color: rgba(253, 203, 110, 0.3);
+                background: rgba(253, 203, 110, 0.05);
+            }
+            #herald-panel-inline .hw-attack-item.hw-failed {
+                border-color: rgba(255, 107, 107, 0.3);
+                background: rgba(255, 107, 107, 0.05);
+            }
+            #herald-panel-inline .hw-attack-to {
+                font-weight: 600;
+                color: #ddd;
+            }
+            #herald-panel-inline .hw-attack-type {
+                font-size: 8px;
+                padding: 2px 8px;
+                border-radius: 10px;
+                text-transform: uppercase;
+                font-weight: 700;
+            }
+            #herald-panel-inline .hw-attack-type.hw-type-ground {
+                background: #00b894;
+                color: #fff;
+            }
+            #herald-panel-inline .hw-attack-type.hw-type-naval {
+                background: #0984e3;
+                color: #fff;
+            }
+            #herald-panel-inline .hw-attack-type.hw-type-mixed {
+                background: #fdcb6e;
+                color: #000;
+            }
+            #herald-panel-inline .hw-attack-badge {
+                font-size: 8px;
+                padding: 2px 8px;
+                border-radius: 10px;
+                background: #6c5ce7;
+                color: #fff;
+                font-weight: 700;
+            }
+            #herald-panel-inline .hw-attack-badge.hw-badge-group {
+                background: #fdcb6e;
+                color: #000;
+            }
+            #herald-panel-inline .hw-attack-time {
+                font-size: 11px;
+                color: #888;
+            }
+            #herald-panel-inline .hw-attack-time.hw-urgent {
+                color: #ff6b6b;
+                font-weight: 700;
+            }
+            #herald-panel-inline .hw-attack-time.hw-warning {
+                color: #fdcb6e;
+                font-weight: 700;
+            }
+            #herald-panel-inline .hw-attack-time.hw-safe {
+                color: #00b894;
+            }
+            #herald-panel-inline .hw-attack-status {
+                font-size: 8px;
+                padding: 2px 10px;
+                border-radius: 10px;
+                text-transform: uppercase;
+                font-weight: 700;
+            }
+            #herald-panel-inline .hw-attack-status.hw-status-waiting {
+                background: rgba(116, 185, 255, 0.15);
+                color: #74b9ff;
+            }
+            #herald-panel-inline .hw-attack-status.hw-status-dodged {
+                background: rgba(0, 184, 148, 0.15);
+                color: #00b894;
+            }
+            #herald-panel-inline .hw-attack-status.hw-status-cancelled {
+                background: rgba(253, 203, 110, 0.1);
+                color: #fdcb6e;
+            }
+            #herald-panel-inline .hw-attack-status.hw-status-failed {
+                background: rgba(255, 107, 107, 0.15);
+                color: #ff6b6b;
+            }
+            #herald-panel-inline .hw-footer {
+                padding: 6px 12px;
+                border-top: 1px solid #333;
+                font-size: 9px;
+                color: #555;
+                text-align: center;
+                background: #0f0f1a;
+                flex-shrink: 0;
+            }
+            #herald-panel-inline .hw-toggle {
+                position: relative;
+                width: 30px;
+                height: 16px;
+                flex-shrink: 0;
+            }
+            #herald-panel-inline .hw-toggle input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            #herald-panel-inline .hw-toggle .hw-toggle-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: #444;
+                transition: 0.3s;
+                border-radius: 16px;
+            }
+            #herald-panel-inline .hw-toggle .hw-toggle-slider:before {
+                position: absolute;
+                content: "";
+                height: 12px;
+                width: 12px;
+                left: 2px;
+                bottom: 2px;
+                background: #888;
+                transition: 0.3s;
+                border-radius: 50%;
+            }
+            #herald-panel-inline .hw-toggle input:checked + .hw-toggle-slider {
+                background: #6c5ce7;
+            }
+            #herald-panel-inline .hw-toggle input:checked + .hw-toggle-slider:before {
+                transform: translateX(14px);
+                background: #fff;
+            }
+            #herald-panel-inline .hw-status-legend {
+                display: flex;
+                gap: 12px;
+                padding: 6px 12px;
+                font-size: 9px;
+                color: #666;
+                background: #0a0a15;
+                border-bottom: 1px solid #333;
+                flex-wrap: wrap;
+            }
+            #herald-panel-inline .hw-status-legend span {
+                display: flex;
+                align-items: center;
+                gap: 3px;
+            }
+            #herald-panel-inline .hw-status-legend .dot {
+                display: inline-block;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+            }
+            #herald-panel-inline .hw-status-legend .dot-waiting { background: #74b9ff; }
+            #herald-panel-inline .hw-status-legend .dot-dodged { background: #00b894; }
+            #herald-panel-inline .hw-status-legend .dot-cancelled { background: #fdcb6e; }
+            #herald-panel-inline .hw-status-legend .dot-failed { background: #ff6b6b; }
+            @media (max-width: 600px) {
+                #herald-panel-inline .hw-attack-item {
+                    font-size: 11px;
+                    padding: 6px 10px;
+                }
+            }
+        </style>
+    `;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🛠️ FUNÇÕES AUXILIARES
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function _gameNow() {
+        try {
+            if (typeof unsafeWindow !== 'undefined' && unsafeWindow.Timestamp && unsafeWindow.Timestamp.server) {
+                return unsafeWindow.Timestamp.server();
+            }
+            return Date.now() / 1000;
+        } catch(e) { return Date.now() / 1000; }
+    }
+
+    function _getGame() {
+        try {
+            if (typeof unsafeWindow !== 'undefined' && unsafeWindow.Game) return unsafeWindow.Game;
+            if (typeof window !== 'undefined' && window.Game) return window.Game;
+        } catch(e) {}
+        return null;
+    }
+
+    function _getMM() {
+        try {
+            if (typeof unsafeWindow !== 'undefined' && unsafeWindow.MM) return unsafeWindow.MM;
+            if (typeof window !== 'undefined' && window.MM) return window.MM;
+        } catch(e) {}
+        return null;
+    }
+
+    function _getITowns() {
+        try {
+            if (typeof unsafeWindow !== 'undefined' && unsafeWindow.ITowns) return unsafeWindow.ITowns;
+            if (typeof window !== 'undefined' && window.ITowns) return window.ITowns;
+        } catch(e) {}
+        return null;
+    }
+
+    function _log(message, type = 'info') {
+        if (!CONFIG.DEBUG && type === 'debug') return;
+        const icons = { info: '📘', success: '✅', warning: '⚠️', error: '❌', debug: '🔍', attack: '⚔️', dodge: '🛡️', naval: '🚢', ground: '⚔️', group: '📦' };
+        const icon = icons[type] || '📘';
+        console.log(`[HERALD] ${icon} [${new Date().toLocaleTimeString()}] ${message}`);
+    }
+
+    function _playSound(type = 'warning') {
+        if (!CONFIG.SOUND_ALERTS) return;
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = type === 'danger' ? 800 : 600;
+            osc.type = 'sine';
+            gain.gain.value = 0.1;
+            osc.start();
+            osc.stop(ctx.currentTime + 0.2);
+        } catch(e) { /* Silencioso */ }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // 🧬 DETETAR TIPO DE ATAQUE
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -62,78 +443,77 @@
     function _getUnitsFromTown(townId, attackType) {
         var units = {};
         var total = 0;
+        var MM = _getMM();
 
         try {
-            var town = uw.ITowns.towns[townId];
-            if (!town) return { units: units, total: 0 };
+            if (MM && MM.getModels && MM.getModels().Units) {
+                var models = MM.getModels().Units;
+                for (var key in models) {
+                    if (!models.hasOwnProperty(key)) continue;
+                    var attrs = models[key].attributes || models[key];
+                    if (String(attrs.home_town_id) !== String(townId)) continue;
+                    if (attrs.current_town_id && String(attrs.current_town_id) !== String(townId)) continue;
 
-            var allUnits = town.units ? town.units() : {};
-            if (!allUnits) return { units: units, total: 0 };
-
-            for (var u in allUnits) {
-                if (allUnits.hasOwnProperty(u) && allUnits[u] > 0) {
-                    var isNaval = UNIDADES_NAVAIS.indexOf(u) !== -1;
-                    var isGround = UNIDADES_TERRESTRES.indexOf(u) !== -1;
-
-                    if (attackType === 'naval' && isNaval) {
-                        units[u] = allUnits[u];
-                        total += allUnits[u];
-                    } else if (attackType === 'ground' && isGround) {
-                        units[u] = allUnits[u];
-                        total += allUnits[u];
-                    } else if (attackType === 'mixed' || !attackType) {
-                        if (isNaval || isGround) {
-                            units[u] = allUnits[u];
-                            total += allUnits[u];
+                    for (var u in attrs) {
+                        if (!attrs.hasOwnProperty(u)) continue;
+                        if (u === 'id' || u === 'home_town_id' || u === 'current_town_id' ||
+                            u === 'current_town_player_id' || u === 'island_x' || u === 'island_y' ||
+                            u === 'number_on_island' || u === 'militia' || u === 'heroes' ||
+                            u === 'home_town_link' || u === 'current_town_link' ||
+                            u === 'current_player_link' || u === 'home_town_name' ||
+                            u === 'current_town_name' || u === 'same_island' ||
+                            u === 'god_favor' || u === 'god_power') continue;
+                        if (typeof attrs[u] === 'number' && attrs[u] > 0) {
+                            var isNaval = UNIDADES_NAVAIS.indexOf(u) !== -1;
+                            var isGround = UNIDADES_TERRESTRES.indexOf(u) !== -1;
+                            if (attackType === 'naval' && isNaval) {
+                                units[u] = (units[u] || 0) + attrs[u];
+                                total += attrs[u];
+                            } else if (attackType === 'ground' && isGround) {
+                                units[u] = (units[u] || 0) + attrs[u];
+                                total += attrs[u];
+                            } else if (attackType === 'mixed' || !attackType) {
+                                units[u] = (units[u] || 0) + attrs[u];
+                                total += attrs[u];
+                            }
                         }
                     }
+                    break;
                 }
             }
         } catch(e) {
-            console.log('[AutoDodge] ❌ Erro ao ler unidades: ' + e.message);
+            _log(`❌ Erro ao ler unidades: ${e.message}`, 'error');
         }
 
         return { units: units, total: total };
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📤 ENVIAR SUPORTE
+    // 📤 ENVIAR SUPORTE - COM RECALCULO DE TEMPO
     // ═══════════════════════════════════════════════════════════════════════
 
     var attackCommands = {};
     var troopsSent = {};
-    var returnTimers = {};
-    var groupStatus = {};
-    var executedGroups = {};
-
-    function _gameNow() {
-        try {
-            if (typeof uw !== 'undefined' && uw.Timestamp && uw.Timestamp.server) {
-                return uw.Timestamp.server();
-            }
-            return Date.now() / 1000;
-        } catch(e) { return Date.now() / 1000; }
-    }
 
     function _sendSupportForGroup(fromTownId, targetTownId, firstTime, lastTime, groupKey, attackType) {
         var timerKey = groupKey + '_' + attackType;
 
         if (troopsSent[timerKey]) {
-            console.log('[AutoDodge] ⏳ Tropas ' + attackType + ' já enviadas');
+            _log(`⏳ Tropas ${attackType} já enviadas para este grupo`, 'info');
             return;
         }
 
         var typeLabel = attackType === 'naval' ? '🚢 NAVAL' : attackType === 'ground' ? '⚔️ TERRESTRE' : '🔄 MISTO';
-        var Game = uw.Game;
+        var Game = _getGame();
 
         if (!Game || !Game.csrfToken) {
-            console.log('[AutoDodge] ❌ Game não disponível para ' + typeLabel);
+            _log(`❌ Game não disponível para ${typeLabel}`, 'error');
             return;
         }
 
         var result = _getUnitsFromTown(fromTownId, attackType);
         if (result.total === 0) {
-            console.log('[AutoDodge] ⚠️ Nenhuma unidade ' + typeLabel + ' disponível em ' + fromTownId);
+            _log(`⚠️ Nenhuma unidade ${typeLabel} disponível em ${fromTownId}`, 'warning');
             return;
         }
 
@@ -149,8 +529,8 @@
 
         var returnTime = Math.max(lastTime - _gameNow() + CONFIG.MARGEM_SEGURANCA_RETORNO, 3);
 
-        console.log('[AutoDodge] 🪖 Enviando ' + limitedTotal + ' ' + typeLabel + ' tropas de ' + fromTownId + ' para ' + targetTownId);
-        console.log('[AutoDodge] ⏱️ Voltar ' + CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS o último ataque');
+        _log(`🪖 Enviando ${limitedTotal} ${typeLabel} tropas de ${fromTownId} para ${targetTownId}`, 'info');
+        _log(`⏱️ Voltar ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS o último ataque (${new Date((lastTime + CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000).toLocaleTimeString()})`, 'info');
 
         var departTime = Math.ceil(_gameNow()) + 1;
         var payload = {
@@ -180,7 +560,9 @@
             xhr.send('json=' + encodeURIComponent(JSON.stringify(payload)));
 
             if (xhr.responseText.indexOf('sucesso') !== -1 || xhr.responseText.indexOf('success') !== -1) {
-                console.log('[AutoDodge] ✅ SUPORTE ' + typeLabel + ' ENVIADO com sucesso!');
+                _log(`✅ SUPORTE ${typeLabel} ENVIADO com sucesso!`, 'success');
+                _playSound('success');
+
                 troopsSent[timerKey] = true;
 
                 try {
@@ -193,7 +575,7 @@
                                     var data = JSON.parse(notif.param_str);
                                     if (data && data.MovementsUnits && data.MovementsUnits.command_id) {
                                         commandId = data.MovementsUnits.command_id;
-                                        console.log('[AutoDodge] 📋 Command ID ' + typeLabel + ': ' + commandId);
+                                        _log(`📋 Command ID ${typeLabel}: ${commandId}`, 'debug');
                                         break;
                                     }
                                 } catch(e) {}
@@ -210,26 +592,28 @@
                     cancelDelay = Math.max(cancelDelay, 1000);
 
                     var timerKey2 = groupKey + '_' + attackType;
-                    if (returnTimers[timerKey2]) {
-                        clearTimeout(returnTimers[timerKey2]);
+                    if (dodgeState.returnTimers[timerKey2]) {
+                        clearTimeout(dodgeState.returnTimers[timerKey2]);
                     }
 
-                    returnTimers[timerKey2] = setTimeout(function() {
+                    dodgeState.returnTimers[timerKey2] = setTimeout(function() {
                         _cancelCommand(commandId, fromTownId, attackType, groupKey);
                         delete troopsSent[timerKey2];
                     }, cancelDelay);
 
-                    console.log('[AutoDodge] ⏱️ ' + typeLabel + ' programado para voltar ' + CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS');
+                    _log(`⏱️ ${typeLabel} programado para voltar ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS`, 'info');
+
                 } else {
-                    console.log('[AutoDodge] ⚠️ Não foi possível extrair command_id para ' + typeLabel);
+                    _log(`⚠️ Não foi possível extrair command_id para ${typeLabel}`, 'warning');
                 }
 
                 return commandId;
+
             } else {
-                console.log('[AutoDodge] ❌ Erro ' + typeLabel + ': ' + xhr.responseText);
+                _log(`❌ Erro ${typeLabel}: ${xhr.responseText}`, 'error');
             }
         } catch(e) {
-            console.log('[AutoDodge] ❌ Erro de rede ' + typeLabel + ': ' + e);
+            _log(`❌ Erro de rede ${typeLabel}: ${e}`, 'error');
         }
 
         return null;
@@ -241,11 +625,11 @@
 
     function _cancelCommand(commandId, townId, attackType, groupKey) {
         var typeLabel = attackType === 'naval' ? '🚢 NAVAL' : attackType === 'ground' ? '⚔️ TERRESTRE' : '🔄 MISTO';
-        console.log('[AutoDodge] 🚫 CANCELANDO ' + typeLabel + ' comando #' + commandId);
+        _log(`🚫 CANCELANDO ${typeLabel} comando #${commandId}`, 'dodge');
 
-        var Game = uw.Game;
+        var Game = _getGame();
         if (!Game || !Game.csrfToken) {
-            console.log('[AutoDodge] ❌ Game não disponível para ' + typeLabel);
+            _log(`❌ Game não disponível para ${typeLabel}`, 'error');
             return;
         }
 
@@ -268,58 +652,67 @@
 
         xhr.onload = function() {
             if (xhr.responseText.indexOf('success') !== -1 || xhr.responseText.indexOf('ok') !== -1) {
-                console.log('[AutoDodge] ✅ TROPAS ' + typeLabel + ' VOLTARAM!');
+                _log(`✅ TROPAS ${typeLabel} VOLTARAM!`, 'success');
+                _playSound('success');
 
                 var timerKey = groupKey + '_' + attackType;
-                if (returnTimers[timerKey]) {
-                    clearTimeout(returnTimers[timerKey]);
-                    delete returnTimers[timerKey];
+                if (dodgeState.returnTimers[timerKey]) {
+                    clearTimeout(dodgeState.returnTimers[timerKey]);
+                    delete dodgeState.returnTimers[timerKey];
                 }
 
-                if (groupStatus[groupKey]) {
-                    groupStatus[groupKey].status = 'cancelled';
+                if (dodgeState.groupStatus[groupKey]) {
+                    dodgeState.groupStatus[groupKey].status = 'cancelled';
                 }
                 _updatePanel();
 
             } else {
-                console.log('[AutoDodge] ❌ Erro ao cancelar ' + typeLabel + ': ' + xhr.responseText);
+                _log(`❌ Erro ao cancelar ${typeLabel}: ${xhr.responseText}`, 'error');
             }
         };
 
         xhr.onerror = function(e) {
-            console.log('[AutoDodge] ❌ Erro de rede ao cancelar ' + typeLabel + ': ' + e);
+            _log(`❌ Erro de rede ao cancelar ${typeLabel}: ${e}`, 'error');
         };
 
         xhr.send('json=' + encodeURIComponent(JSON.stringify(payload)));
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🔍 SCAN DE ATAQUES
+    // 🔍 SCAN DE ATAQUES - COM RECALCULO DE GRUPOS
     // ═══════════════════════════════════════════════════════════════════════
 
-    var isScanning = false;
-    var lastScan = 0;
-    var groupTimers = {};
+    var dodgeState = {
+        groupTimers: {},
+        returnTimers: {},
+        groupStatus: {},
+        isScanning: false,
+        lastScan: 0,
+        executedGroups: {},
+    };
 
     function _scanAttacks() {
         var now = Date.now();
-        if (isScanning || (now - lastScan < 200)) return;
-        isScanning = true;
-        lastScan = now;
+        if (dodgeState.isScanning || (now - dodgeState.lastScan < 200)) return;
+        dodgeState.isScanning = true;
+        dodgeState.lastScan = now;
 
         try {
+            var MM = _getMM();
+            if (!MM) { dodgeState.isScanning = false; return; }
+            var mu = MM.getModels && MM.getModels().MovementsUnits;
+            if (!mu) { dodgeState.isScanning = false; return; }
+
             var nowTime = _gameNow();
-            var myTowns = uw.ITowns ? uw.ITowns.towns : {};
+            var ITowns = _getITowns();
+            var myTowns = ITowns && ITowns.getTowns ? ITowns.getTowns() : {};
 
             // 1. COLETAR TODOS OS ATAQUES POR CIDADE
             var cityAttacks = {};
 
-            var models = uw.MM.getModels().MovementsUnits;
-            if (!models) { isScanning = false; return; }
-
-            for (var key in models) {
-                if (!models.hasOwnProperty(key)) continue;
-                var attrs = models[key].attributes;
+            for (var key in mu) {
+                if (!mu.hasOwnProperty(key)) continue;
+                var attrs = mu[key].attributes || mu[key];
                 if (!attrs || !attrs.target_town_id) continue;
 
                 var targetIsMine = !!myTowns[attrs.target_town_id];
@@ -349,13 +742,13 @@
                 var attacks = cityAttacks[townId];
                 if (attacks.length === 0) continue;
 
+                attacks.sort(function(a, b) { return a.arrival - b.arrival; });
+
                 var destino = CIDADES[townId];
                 if (!destino) {
-                    console.log('[AutoDodge] ⚠️ Cidade ' + townId + ' sem destino configurado!');
+                    _log(`⚠️ Cidade ${townId} sem destino configurado!`, 'warning');
                     continue;
                 }
-
-                attacks.sort(function(a, b) { return a.arrival - b.arrival; });
 
                 // 3. CRIAR GRUPOS
                 var groups = [];
@@ -379,7 +772,7 @@
                     var lastTime = group[group.length - 1].arrival;
                     var groupKey = townId + '_group_' + firstTime + '_' + g;
 
-                    if (executedGroups[groupKey]) {
+                    if (dodgeState.executedGroups[groupKey]) {
                         continue;
                     }
 
@@ -390,12 +783,13 @@
                         continue;
                     }
 
-                    // ⭐ VERIFICAR SE JÁ EXISTE UM GRUPO PARA ESTA CIDADE
+                    // ⭐ VERIFICAR SE JÁ EXISTE UM GRUPO PARA ESTA CIDADE E ATUALIZAR
                     var existingGroupKey = null;
-                    for (var existingKey in groupStatus) {
-                        if (groupStatus.hasOwnProperty(existingKey)) {
-                            var data = groupStatus[existingKey];
+                    for (var existingKey in dodgeState.groupStatus) {
+                        if (dodgeState.groupStatus.hasOwnProperty(existingKey)) {
+                            var data = dodgeState.groupStatus[existingKey];
                             if (data && data.townId == townId && !data.dodged) {
+                                // Verificar se o novo ataque está dentro da janela do grupo existente
                                 if (Math.abs(data.lastTime - lastTime) <= CONFIG.JANELA_GRUPO) {
                                     existingGroupKey = existingKey;
                                     break;
@@ -405,27 +799,32 @@
                     }
 
                     if (existingGroupKey) {
-                        // ATUALIZAR GRUPO EXISTENTE
-                        var existingData = groupStatus[existingGroupKey];
+                        // ⭐ ATUALIZAR GRUPO EXISTENTE
+                        var existingData = dodgeState.groupStatus[existingGroupKey];
+                        // Adicionar novos ataques ao grupo
                         for (var a = 0; a < group.length; a++) {
                             var exists = existingData.attacks.some(function(att) { return att.cmdId === group[a].cmdId; });
                             if (!exists) {
                                 existingData.attacks.push(group[a]);
                             }
                         }
+                        // Reordenar e recalcular
                         existingData.attacks.sort(function(a, b) { return a.arrival - b.arrival; });
                         existingData.firstTime = existingData.attacks[0].arrival;
                         existingData.lastTime = existingData.attacks[existingData.attacks.length - 1].arrival;
                         existingData.isGroup = existingData.attacks.length > 1;
 
-                        console.log('[AutoDodge] 📦 GRUPO ATUALIZADO para ' + townId + ': ' + existingData.attacks.length + ' ataques');
+                        _log(`📦 GRUPO ATUALIZADO para ${townId}: ${existingData.attacks.length} ataques`, 'group');
+                        _log(`   ├─ Primeiro: ${new Date(existingData.firstTime * 1000).toLocaleTimeString()}`, 'debug');
+                        _log(`   └─ Último: ${new Date(existingData.lastTime * 1000).toLocaleTimeString()}`, 'debug');
 
-                        if (groupTimers[existingGroupKey]) {
-                            clearTimeout(groupTimers[existingGroupKey]);
+                        // Reagendar dodge com novo tempo
+                        if (dodgeState.groupTimers[existingGroupKey]) {
+                            clearTimeout(dodgeState.groupTimers[existingGroupKey]);
                         }
 
                         var newDodgeDelay = Math.max(existingData.firstTime - nowTime - CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
-                        groupTimers[existingGroupKey] = setTimeout(function() {
+                        dodgeState.groupTimers[existingGroupKey] = setTimeout(function() {
                             _executeDodgeForGroup(existingData.townId, existingData.destino, existingData.firstTime, existingData.lastTime, existingData.attacks, existingGroupKey, existingData.isGroup);
                         }, newDodgeDelay);
 
@@ -433,7 +832,7 @@
                     }
 
                     // 5. CRIAR NOVO GRUPO
-                    groupStatus[groupKey] = {
+                    dodgeState.groupStatus[groupKey] = {
                         townId: townId,
                         destino: destino,
                         firstTime: firstTime,
@@ -445,16 +844,20 @@
                     };
 
                     var typeLabel = isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
-                    console.log('[AutoDodge] ' + typeLabel + ' para ' + townId + ' (' + group.length + ' ataques)');
+                    _log(`${typeLabel} para ${townId} (${group.length} ataques)`, isGroup ? 'group' : 'attack');
+                    _log(`   ├─ Primeiro: ${new Date(firstTime * 1000).toLocaleTimeString()}`, 'debug');
+                    _log(`   ├─ Último: ${new Date(lastTime * 1000).toLocaleTimeString()}`, 'debug');
+                    _log(`   ├─ ⭐ Enviar ${CONFIG.TEMPO_ANTECEDENCIA}s ANTES`, 'dodge');
+                    _log(`   └─ Voltar ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS`, 'dodge');
 
                     // 6. AGENDAR DODGE
                     var dodgeDelay = Math.max(firstTime - nowTime - CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
 
-                    if (groupTimers[groupKey]) {
-                        clearTimeout(groupTimers[groupKey]);
+                    if (dodgeState.groupTimers[groupKey]) {
+                        clearTimeout(dodgeState.groupTimers[groupKey]);
                     }
 
-                    groupTimers[groupKey] = setTimeout(function() {
+                    dodgeState.groupTimers[groupKey] = setTimeout(function() {
                         _executeDodgeForGroup(townId, destino, firstTime, lastTime, group, groupKey, isGroup);
                     }, dodgeDelay);
                 }
@@ -463,10 +866,10 @@
             _updatePanel();
 
         } catch(e) {
-            console.log('[AutoDodge] ⚠️ Erro no scan: ' + e.message);
+            _log(`⚠️ Erro no scan: ${e.message}`, 'error');
         }
 
-        isScanning = false;
+        dodgeState.isScanning = false;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -475,15 +878,16 @@
 
     function _executeDodgeForGroup(townId, destino, firstTime, lastTime, attacks, groupKey, isGroup) {
         try {
-            if (executedGroups[groupKey]) {
+            if (dodgeState.executedGroups[groupKey]) {
+                _log(`ℹ️ Grupo ${groupKey} já executado`, 'info');
                 return;
             }
 
             var troops = _getUnitsFromTown(townId, 'mixed');
             if (troops.total < CONFIG.MIN_TROOPS_TO_DODGE) {
-                console.log('[AutoDodge] ⚠️ Tropas insuficientes em ' + townId + ': ' + troops.total);
-                if (groupStatus[groupKey]) {
-                    groupStatus[groupKey].status = 'failed';
+                _log(`⚠️ Tropas insuficientes em ${townId}: ${troops.total}`, 'warning');
+                if (dodgeState.groupStatus[groupKey]) {
+                    dodgeState.groupStatus[groupKey].status = 'failed';
                 }
                 _updatePanel();
                 return;
@@ -491,9 +895,14 @@
 
             var typeLabel = isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
             var numAttacks = attacks.length;
-            console.log('[AutoDodge] ⚡ EXECUTANDO DODGE ' + typeLabel + ' para ' + townId + ' (' + numAttacks + ' ataques)');
+            _log(`⚡ EXECUTANDO DODGE ${typeLabel} para ${townId} (${numAttacks} ataques)`, 'dodge');
+            _log(`⏱️ Primeiro ataque: ${new Date(firstTime * 1000).toLocaleTimeString()}`, 'dodge');
+            _log(`⏱️ Último ataque: ${new Date(lastTime * 1000).toLocaleTimeString()}`, 'dodge');
+            _log(`⏱️ Enviar ${CONFIG.TEMPO_ANTECEDENCIA}s ANTES`, 'dodge');
+            _log(`⏱️ Voltar ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS (${new Date((lastTime + CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000).toLocaleTimeString()})`, 'dodge');
+            _playSound('danger');
 
-            executedGroups[groupKey] = true;
+            dodgeState.executedGroups[groupKey] = true;
 
             // ENVIAR TERRESTRES
             _sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'ground');
@@ -503,21 +912,20 @@
                 _sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'naval');
             }, CONFIG.DIFERENCA_ENVIO * 1000);
 
-            if (groupStatus[groupKey]) {
-                groupStatus[groupKey].dodged = true;
-                groupStatus[groupKey].status = 'dodged';
+            if (dodgeState.groupStatus[groupKey]) {
+                dodgeState.groupStatus[groupKey].dodged = true;
+                dodgeState.groupStatus[groupKey].status = 'dodged';
             }
 
-            console.log('[AutoDodge] ✅ Dodge executado para ' + groupKey + '!');
-            _updatePanel();
+            _log(`✅ Dodge executado para ${groupKey}!`, 'success');
 
         } catch(e) {
-            console.log('[AutoDodge] ❌ Erro ao executar dodge: ' + e.message);
-            if (groupStatus[groupKey]) {
-                groupStatus[groupKey].status = 'failed';
+            _log(`❌ Erro ao executar dodge: ${e.message}`, 'error');
+            if (dodgeState.groupStatus[groupKey]) {
+                dodgeState.groupStatus[groupKey].status = 'failed';
             }
-            _updatePanel();
         }
+        _updatePanel();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -525,67 +933,105 @@
     // ═══════════════════════════════════════════════════════════════════════
 
     function _updatePanel() {
-        try {
-            var logDiv = document.getElementById('dodge_log');
-            if (!logDiv) return;
+        var panel = document.getElementById('herald-panel-inline');
+        if (!panel) return;
 
-            var now = _gameNow();
-            var attackCount = 0;
-            var html = '';
+        var list = panel.querySelector('.hw-attack-list');
+        if (!list) return;
+        list.innerHTML = '';
 
-            var groups = [];
-            for (var key in groupStatus) {
-                if (groupStatus.hasOwnProperty(key)) {
-                    var data = groupStatus[key];
-                    if (data && data.lastTime > now - 10) {
-                        groups.push(data);
-                    }
+        var now = _gameNow();
+        var attackCount = 0;
+
+        var groups = [];
+        for (var key in dodgeState.groupStatus) {
+            if (dodgeState.groupStatus.hasOwnProperty(key)) {
+                var data = dodgeState.groupStatus[key];
+                if (data && data.lastTime > now - 10) {
+                    groups.push(data);
                 }
             }
+        }
 
-            if (groups.length === 0) {
-                html = '<div style="color:#666;padding:5px 0;">🛡️ Nenhum ataque detectado</div>';
-            } else {
-                groups.sort(function(a, b) { return a.firstTime - b.firstTime; });
+        if (groups.length === 0) {
+            list.innerHTML = `
+                <div class="hw-empty-state">
+                    <div class="hw-empty-icon">🛡️</div>
+                    <div>Nenhum ataque detectado</div>
+                    <div style="font-size:10px;color:#555;margin-top:4px;">${Object.keys(CIDADES).length} cidades protegidas</div>
+                </div>
+            `;
+        } else {
+            groups.sort(function(a, b) { return a.firstTime - b.firstTime; });
 
-                for (var i = 0; i < groups.length; i++) {
-                    var data = groups[i];
-                    var timeLeft = Math.round(data.firstTime - now);
-                    var timeStr = timeLeft > 0 ? (timeLeft > 60 ? Math.round(timeLeft / 60) + 'm ' + (timeLeft % 60) + 's' : timeLeft + 's') : '💥';
+            for (var i = 0; i < groups.length; i++) {
+                var data = groups[i];
+                var item = document.createElement('div');
+                item.className = 'hw-attack-item';
 
-                    var statusMap = {
-                        'waiting': '⏳',
-                        'dodged': '🌀',
-                        'cancelled': '✅',
-                        'failed': '❌'
-                    };
-                    var statusIcon = statusMap[data.status] || '⏳';
-                    var typeLabel = data.isGroup ? '📦' : '🎯';
-                    var count = data.attacks ? data.attacks.length : 1;
-
-                    html += '<div style="padding:3px 0;border-bottom:1px solid #333;font-size:11px;">';
-                    html += typeLabel + ' 🏙️ ' + data.townId + ' → ' + data.destino;
-                    html += ' ⏱️ ' + timeStr;
-                    html += ' ' + statusIcon;
-                    if (data.isGroup) {
-                        html += ' (' + count + ' ataques)';
-                    }
-                    html += '</div>';
-                    attackCount++;
+                if (data.dodged) {
+                    item.classList.add('hw-dodged');
                 }
+                if (data.isGroup) {
+                    item.classList.add('hw-group');
+                }
+                if (data.status === 'failed') {
+                    item.classList.add('hw-failed');
+                }
+
+                var timeLeft = Math.round(data.firstTime - now);
+                var timeStr = timeLeft > 0 ? (timeLeft > 60 ? Math.round(timeLeft / 60) + 'm ' + (timeLeft % 60) + 's' : timeLeft + 's') : '💥';
+
+                var timeColor = '';
+                if (timeLeft < 5 && timeLeft > 0) timeColor = 'hw-urgent';
+                else if (timeLeft < 15 && timeLeft > 0) timeColor = 'hw-warning';
+                else if (timeLeft > 0) timeColor = 'hw-safe';
+
+                var typeLabel = data.isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
+                var badgeHtml = '';
+                if (data.isGroup) {
+                    badgeHtml = `<span class="hw-attack-badge hw-badge-group">${data.attacks.length} ataques</span>`;
+                }
+
+                var statusMap = {
+                    'waiting': '⏳ Aguardando',
+                    'dodged': '🌀 Desviado',
+                    'cancelled': '✅ Voltou',
+                    'failed': '❌ Falhou'
+                };
+                var statusClassMap = {
+                    'waiting': 'hw-status-waiting',
+                    'dodged': 'hw-status-dodged',
+                    'cancelled': 'hw-status-cancelled',
+                    'failed': 'hw-status-failed'
+                };
+
+                var statusText = statusMap[data.status] || '⏳ Aguardando';
+                var statusClass = statusClassMap[data.status] || 'hw-status-waiting';
+
+                var firstStr = new Date(data.firstTime * 1000).toLocaleTimeString();
+                var lastStr = new Date(data.lastTime * 1000).toLocaleTimeString();
+                var returnStr = new Date((data.lastTime + CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000).toLocaleTimeString();
+
+                item.innerHTML = `
+                    <span class="hw-attack-to">🏙️ ${data.townId} → ${data.destino}</span>
+                    <span style="font-size:10px;color:#888;">${typeLabel}</span>
+                    ${badgeHtml}
+                    <span class="hw-attack-time ${timeColor}">⏱️ ${timeStr}</span>
+                    <span style="font-size:9px;color:#666;">${firstStr} → ${lastStr}</span>
+                    <span style="font-size:9px;color:#00b894;">↩️ ${returnStr}</span>
+                    <span class="hw-attack-status ${statusClass}">${statusText}</span>
+                `;
+
+                list.appendChild(item);
+                attackCount++;
             }
+        }
 
-            logDiv.innerHTML = html;
-
-            // Atualizar título
-            var titleDiv = document.getElementById('dodge_title');
-            if (titleDiv) {
-                var statusText = attackCount > 0 ? '🔴 ' + attackCount + ' grupo(s)' : '🟢 Nenhum ataque';
-                titleDiv.textContent = 'Auto Fuga (Dodge V49.2) - ' + statusText;
-            }
-
-        } catch(e) {
-            // Silencioso
+        var counter = panel.querySelector('.hw-count');
+        if (counter) {
+            counter.textContent = attackCount;
+            counter.classList.toggle('hw-count-danger', attackCount > 0);
         }
     }
 
@@ -599,33 +1045,57 @@
 
         settings: function() {
             var isActive = this._active;
-            var statusColor = isActive ? '#1a6b2a' : '#888';
             var statusText = isActive ? '🔴 ATIVO' : '⏸️ INATIVO';
+            var statusColor = isActive ? '#00b894' : '#888';
 
-            return (
-                '<div class="game_border" style="margin-bottom:20px;">' +
-                '<div class="game_border_top"></div><div class="game_border_bottom"></div>' +
-                '<div class="game_border_left"></div><div class="game_border_right"></div>' +
-                '<div class="game_border_corner corner1"></div><div class="game_border_corner corner2"></div>' +
-                '<div class="game_border_corner corner3"></div><div class="game_border_corner corner4"></div>' +
-                '<div style="padding:8px 12px;background:#1a1a2e;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;">' +
-                '<span id="dodge_title" style="font-weight:bold;font-size:14px;color:#a29bfe;">Auto Fuga (Dodge V49.2) - <span style="color:' + statusColor + ';">' + statusText + '</span></span>' +
-                '<button onclick="window._toggleDodge()" style="padding:4px 16px;border-radius:6px;border:none;cursor:pointer;background:' + (isActive ? '#ff6b6b' : '#00b894') + ';color:#fff;font-weight:bold;">' + (isActive ? 'PARAR' : 'INICIAR') + '</button>' +
-                '</div>' +
-                '<div style="padding:8px 12px;font-size:11px;background:#0f0f1a;border-bottom:1px solid #333;">' +
-                '📦 Ataques com menos de ' + CONFIG.JANELA_GRUPO + 's = GRUPO | ' +
-                '⭐ Envia ' + CONFIG.TEMPO_ANTECEDENCIA + 's ANTES | ' +
-                '⭐ Volta ' + CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS<br>' +
-                '🏙️ ' + Object.keys(CIDADES).length + ' cidades protegidas' +
-                '</div>' +
-                '<div id="dodge_log" style="padding:8px 12px;min-height:60px;max-height:300px;overflow-y:auto;font-size:11px;color:#ddd;background:#0a0a15;">' +
-                '🛡️ Nenhum ataque detectado' +
-                '</div>' +
-                '<div style="padding:4px 12px;font-size:9px;color:#555;background:#0f0f1a;border-top:1px solid #333;text-align:center;">' +
-                'Dodge Ultimate V49.2 - Agrupamento + Recall Automático' +
-                '</div>' +
-                '</div>'
-            );
+            return estiloPainel + `
+                <div id="herald-panel-inline">
+                    <div class="hw-header">
+                        <div class="hw-title">
+                            <span>🛡️</span>
+                            Herald SO
+                            <span style="font-size:9px;background:#6c5ce7;padding:2px 8px;border-radius:10px;color:#fff;">V49.2</span>
+                            <span style="font-size:10px;color:${statusColor};margin-left:8px;">${statusText}</span>
+                        </div>
+                        <div class="hw-controls">
+                            <span class="hw-counter">⚔️ <span class="hw-count" id="hw-count-inline">0</span></span>
+                            <button class="hw-btn hw-btn-success" onclick="window._toggleDodgeInline()" style="padding:4px 12px;font-size:11px;">
+                                ${isActive ? 'PARAR' : 'INICIAR'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="hw-toolbar">
+                        <input class="hw-search" placeholder="🔍 Filtrar..." oninput="window._hwSearchInline(this.value)">
+                        <button class="hw-btn" onclick="window._hwRefreshInline()">🔄</button>
+                        <button class="hw-btn hw-btn-danger" onclick="window._hwClearAttacksInline()">🗑️</button>
+                        <button class="hw-btn hw-btn-success" onclick="window._hwTestDodgeInline()">🧪</button>
+                        <label class="hw-toggle">
+                            <input type="checkbox" ${CONFIG.AUTO_DODGE ? 'checked' : ''} onchange="window._hwToggleDodgeInline(this.checked)">
+                            <span class="hw-toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="hw-status-legend">
+                        <span><span class="dot dot-waiting"></span> Aguardando</span>
+                        <span><span class="dot dot-dodged"></span> Desviado</span>
+                        <span><span class="dot dot-cancelled"></span> Voltou</span>
+                        <span><span class="dot dot-failed"></span> Falhou</span>
+                    </div>
+
+                    <div class="hw-attack-list">
+                        <div class="hw-empty-state">
+                            <div class="hw-empty-icon">🛡️</div>
+                            <div>Nenhum ataque detectado</div>
+                            <div style="font-size:10px;color:#555;margin-top:4px;">${Object.keys(CIDADES).length} cidades protegidas</div>
+                        </div>
+                    </div>
+
+                    <div class="hw-footer">
+                        ⭐ Menos de ${CONFIG.JANELA_GRUPO}s = GRUPO | ${CONFIG.TEMPO_ANTECEDENCIA}s ANTES | ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS
+                    </div>
+                </div>
+            `;
         },
 
         start: function() {
@@ -645,17 +1115,17 @@
             }
 
             // Limpar timers
-            for (var key in groupTimers) {
-                clearTimeout(groupTimers[key]);
+            for (var key in dodgeState.groupTimers) {
+                clearTimeout(dodgeState.groupTimers[key]);
             }
-            for (var key in returnTimers) {
-                clearTimeout(returnTimers[key]);
+            for (var key in dodgeState.returnTimers) {
+                clearTimeout(dodgeState.returnTimers[key]);
             }
 
-            groupTimers = {};
-            returnTimers = {};
-            groupStatus = {};
-            executedGroups = {};
+            dodgeState.groupTimers = {};
+            dodgeState.returnTimers = {};
+            dodgeState.groupStatus = {};
+            dodgeState.executedGroups = {};
             troopsSent = {};
             attackCommands = {};
 
@@ -669,40 +1139,140 @@
     };
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🔄 FUNÇÕES GLOBAIS PARA O BOTÃO
+    // 🔄 FUNÇÕES GLOBAIS PARA O PAINEL
     // ═══════════════════════════════════════════════════════════════════════
 
-    window._toggleDodge = function() {
+    window._toggleDodgeInline = function() {
         if (AutoDodge._active) {
             AutoDodge.stop();
         } else {
             AutoDodge.start();
         }
-        // Recarregar settings para atualizar o botão
         if (window.MultBot && window.MultBot.loadModule) {
             window.MultBot.loadModule('AutoDodge');
         }
     };
 
-    window._scanAttacks = function() {
+    window._hwSearchInline = function(val) {
+        var items = document.querySelectorAll('#herald-panel-inline .hw-attack-item');
+        var search = val.toLowerCase();
+        for (var i = 0; i < items.length; i++) {
+            items[i].style.display = items[i].textContent.toLowerCase().indexOf(search) >= 0 ? '' : 'none';
+        }
+    };
+
+    window._hwRefreshInline = function() {
         _scanAttacks();
+        _updatePanel();
+    };
+
+    window._hwClearAttacksInline = function() {
+        if (!confirm('🗑️ Limpar todos os ataques?')) return;
+        for (var key in dodgeState.groupTimers) {
+            clearTimeout(dodgeState.groupTimers[key]);
+        }
+        for (var key in dodgeState.returnTimers) {
+            clearTimeout(dodgeState.returnTimers[key]);
+        }
+        dodgeState.groupStatus = {};
+        dodgeState.groupTimers = {};
+        dodgeState.returnTimers = {};
+        dodgeState.executedGroups = {};
+        troopsSent = {};
+        attackCommands = {};
+        _updatePanel();
+        _log('✅ Todos os ataques foram limpos', 'success');
+    };
+
+    window._hwTestDodgeInline = function() {
+        var towns = Object.keys(CIDADES);
+        if (towns.length === 0) {
+            _log('⚠️ Nenhuma cidade configurada!', 'warning');
+            return;
+        }
+        var townId = parseInt(towns[0]);
+        var destino = CIDADES[townId];
+        var now = _gameNow();
+
+        _log(`🧪 Simulando ataques para ${townId}...`, 'info');
+
+        var tempos = [10, 11, 24, 27, 40];
+
+        var attacks = [];
+        for (var i = 0; i < tempos.length; i++) {
+            var arrival = now + tempos[i];
+            var key = 'sim_' + Date.now() + '_' + i;
+            attacks.push({
+                cmdId: key,
+                arrival: arrival,
+                type: 'mixed'
+            });
+            _log(`🧪 Ataque ${i+1} às ${new Date(arrival * 1000).toLocaleTimeString()}`, 'debug');
+        }
+
+        // Adicionar ataques à cidade
+        var cityAttacks = {};
+        cityAttacks[townId] = attacks;
+
+        _log(`🎯 ${attacks.length} ataques simulados!`, 'attack');
+
+        // Processar manualmente
+        var groups = [];
+        var currentGroup = [attacks[0]];
+        for (var i = 1; i < attacks.length; i++) {
+            var gap = attacks[i].arrival - attacks[i-1].arrival;
+            if (gap <= CONFIG.JANELA_GRUPO) {
+                currentGroup.push(attacks[i]);
+            } else {
+                groups.push(currentGroup);
+                currentGroup = [attacks[i]];
+            }
+        }
+        groups.push(currentGroup);
+
+        for (var g = 0; g < groups.length; g++) {
+            var group = groups[g];
+            var firstTime = group[0].arrival;
+            var lastTime = group[group.length - 1].arrival;
+            var groupKey = townId + '_group_' + firstTime + '_' + g;
+            var isGroup = group.length > 1;
+
+            dodgeState.groupStatus[groupKey] = {
+                townId: townId,
+                destino: destino,
+                firstTime: firstTime,
+                lastTime: lastTime,
+                attacks: group,
+                isGroup: isGroup,
+                status: 'waiting',
+                dodged: false
+            };
+
+            var dodgeDelay = Math.max(firstTime - now - CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
+            setTimeout(function(data, key) {
+                _executeDodgeForGroup(data.townId, data.destino, data.firstTime, data.lastTime, data.attacks, key, data.isGroup);
+            }.bind(null, dodgeState.groupStatus[groupKey], groupKey), dodgeDelay);
+        }
+
+        _updatePanel();
+    };
+
+    window._hwToggleDodgeInline = function(checked) {
+        CONFIG.AUTO_DODGE = checked;
+        _log(`🛡️ Dodge automático: ${checked ? 'ATIVADO' : 'DESATIVADO'}`, 'info');
     };
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📦 REGISTRAR MÓDULO NO MULTBOT - ABA ATAQUE
+    // 📦 REGISTAR MÓDULO NO MULTBOT - ABA ATAQUE
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Esperar o MultBot carregar
     var checkMultBot = setInterval(function() {
         try {
-            // Verificar se o MultBot já existe
             if (typeof window.MultBot === 'undefined') {
                 return;
             }
 
-            // Verificar se o método registerModule existe
             if (typeof window.MultBot.registerModule === 'undefined') {
-                // Se não existir, criar o método
                 window.MultBot.registerModule = function(name, module) {
                     if (!this.modules) {
                         this.modules = {};
@@ -712,7 +1282,6 @@
                 };
             }
 
-            // Verificar se o método loadModule existe
             if (typeof window.MultBot.loadModule === 'undefined') {
                 window.MultBot.loadModule = function(name) {
                     console.log('[MultBot] A carregar módulo: ' + name);
@@ -721,7 +1290,6 @@
 
             clearInterval(checkMultBot);
 
-            // Registrar módulo na aba Ataque
             window.MultBot.registerModule('AutoDodge', {
                 name: 'AutoDodge',
                 category: 'ataque',
@@ -733,28 +1301,21 @@
 
             console.log('[AutoDodge] ✅ Módulo registado na aba Ataque!');
 
-            // Iniciar se estava ativo
             if (AutoDodge._active) {
                 AutoDodge.start();
             }
 
-            // Carregar módulo
             if (window.MultBot.loadModule) {
                 window.MultBot.loadModule('AutoDodge');
             }
 
         } catch(e) {
-            // Silencioso - tentar novamente
+            // Silencioso
         }
     }, 500);
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🚀 INICIALIZAÇÃO
-    // ═══════════════════════════════════════════════════════════════════════
 
     console.log('[AutoDodge] 🛡️ Dodge Ultimate V49.2');
     console.log('[AutoDodge] 📦 Ataques com menos de ' + CONFIG.JANELA_GRUPO + 's = GRUPO');
     console.log('[AutoDodge] 🏙️ ' + Object.keys(CIDADES).length + ' cidades protegidas');
-    console.log('[AutoDodge] ✅ Aguardando MultBot...');
 
 })();

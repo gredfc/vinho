@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════
 //  MODULE: StatusPanel
 //  Painel de status em tempo real de todos os módulos
-//  Design elegante com letras cinzentas
+//  Design elegante com tabelas e linhas
 // ══════════════════════════════════════════════════════
 
 var StatusPanel = class extends MultUtil {
@@ -137,7 +137,22 @@ var StatusPanel = class extends MultUtil {
             rows.push(this._row('🔥', 'Sacrifício de Ares', aresActive, aresActive ? 'Ativo' : 'Parado', 'autoAresSacrifice', 'toggle'));
             rows.push(this._row('📚', 'Auto Pesquisa', researchActive, researchActive ? 'Ativo' : 'Parado', 'autoResearch', 'toggle'));
 
-            uw.$('#status_rows').html(rows.join(''));
+            // Montar tabela
+            let html = `
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                    <tr style="border-bottom:2px solid #444;">
+                        <th style="text-align:left;padding:8px 10px;color:#888;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Módulo</th>
+                        <th style="text-align:left;padding:8px 10px;color:#888;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Status</th>
+                        <th style="text-align:right;padding:8px 10px;color:#888;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.join('')}
+                </tbody>
+            </table>`;
+
+            uw.$('#status_rows').html(html);
         } catch(e) {
             uw.$('#status_rows').html(`<div style="padding:12px;color:#888;text-align:center;">❌ ${this.t('error')}: ${e.message}</div>`);
         }
@@ -148,32 +163,33 @@ var StatusPanel = class extends MultUtil {
             ? `window.multBot.${module}.${method}()`
             : null;
 
-        const statusText = active ? '● Ativo' : '○ Parado';
+        const statusColor = active ? '#888' : '#555';
+        const statusDot = active ? '🟢' : '⚪';
+        const statusText = active ? 'Ativo' : 'Parado';
 
         const btn = onclick
-            ? `<div class="button_new ${active ? '' : 'disabled'}" onclick="${onclick}" style="cursor:pointer;margin:0;padding:2px 10px;min-height:24px;">
+            ? `<div class="button_new ${active ? '' : 'disabled'}" onclick="${onclick}" style="cursor:pointer;margin:0;padding:2px 10px;min-height:24px;display:inline-block;">
                 <div class="left"></div><div class="right"></div>
-                <div class="caption js-caption" style="font-size:10px;padding:0 8px;color:#888;">${active ? '🟢 Ativo' : '⚪ Parado'}<div class="effect js-effect"></div></div>
+                <div class="caption js-caption" style="font-size:10px;padding:0 8px;color:#888;">${active ? '🟢' : '⚪'}<div class="effect js-effect"></div></div>
                </div>`
-            : `<span style="font-size:11px;color:#666;font-weight:300;">—</span>`;
+            : `<span style="font-size:11px;color:#555;">—</span>`;
 
         return `
-        <div style="display:flex;justify-content:space-between;align-items:center;
-            padding:6px 10px;margin:2px 0;
-            background:${active ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.01)'};
-            border-radius:6px;
-            border-left:3px solid ${active ? '#777' : '#444'};
-            transition:all 0.3s ease;">
-            <div style="display:flex;align-items:center;gap:8px;">
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);background:${active ? 'rgba(255,255,255,0.02)' : 'transparent'};">
+            <td style="padding:6px 10px;color:#999;display:flex;align-items:center;gap:8px;">
                 <span style="font-size:16px;opacity:0.6;">${icon}</span>
-                <span style="font-weight:600;font-size:12px;color:#999;">${label}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:11px;color:${active ? '#999' : '#666'};font-weight:${active ? '500' : '300'};">${value}</span>
-                <span style="font-size:10px;color:${active ? '#888' : '#555'};font-weight:${active ? '500' : '300'};">${statusText}</span>
+                <span style="font-weight:500;">${label}</span>
+            </td>
+            <td style="padding:6px 10px;">
+                <span style="color:${statusColor};font-weight:${active ? '500' : '300'};">
+                    ${statusDot} ${statusText}
+                </span>
+                <span style="color:#666;font-size:10px;margin-left:6px;">${value}</span>
+            </td>
+            <td style="padding:6px 10px;text-align:right;">
                 ${btn}
-            </div>
-        </div>`;
+            </td>
+        </tr>`;
     }
 
     _countCelebrations() {

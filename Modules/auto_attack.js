@@ -26,11 +26,11 @@ var AutoDodge = class extends MultUtil {
         this.CONFIG = {
             TEMPO_ANTECEDENCIA: 4,
             INTERVALO_REFRESH_ATAQUES: 2,
-            MARGEM_SEGURANCA_RETORNO: 2,
+            MARGEM_SEGURANCA_RETORNO: 0,
             DIFERENCA_ENVIO: 0.5,
             JANELA_GRUPO: 10,
             MIN_TROOPS_TO_DODGE: 1,
-            MAX_TROOPS_TO_SEND: 1000,
+            MAX_TROOPS_TO_SEND: 5000,
             SOUND_ALERTS: true,
             DEBUG: false,
             AUTO_DODGE: true,

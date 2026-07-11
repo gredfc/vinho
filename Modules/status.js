@@ -21,13 +21,13 @@ var StatusPanel = class extends MultUtil {
     settings = () => {
         requestAnimationFrame(() => this._startVisuals());
         return `
-        <div style="padding:10px 14px;background:#f8f9fa;border-radius:6px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid #dee2e6;">
-            <span style="font-weight:600;font-size:12px;color:#495057;">🔄 Auto Refresh</span>
+        <div style="padding:10px 14px;background:#1a5276;border-radius:6px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid #1a5276;">
+            <span style="font-weight:600;font-size:12px;color:#f8f9fa;">🔄 Auto Refresh</span>
             <input id="refresh_minutes_input" type="number" min="0" max="999" value="${this._refreshMinutes}"
                 style="width:60px;padding:5px 8px;background:#fff;border:1px solid #ced4da;border-radius:4px;color:#495057;font-size:12px;" placeholder="min" />
             ${this.getButtonHtml('btn_set_refresh', 'Aplicar', this._applyRefresh)}
-            <span id="refresh_status" style="font-size:11px;color:#6c757d;"></span>
-            <span id="refresh_countdown" style="font-size:12px;color:#495057;font-weight:600;margin-left:auto;"></span>
+            <span id="refresh_status" style="font-size:11px;color:#f8f9fa;"></span>
+            <span id="refresh_countdown" style="font-size:12px;color:#f8f9fa;font-weight:600;margin-left:auto;"></span>
         </div>
         <div id="status_rows" style="padding:0;"></div>`;
     };
@@ -40,7 +40,7 @@ var StatusPanel = class extends MultUtil {
         if (!val || val <= 0) {
             this._refreshMinutes = 0;
             this.storage.save('refresh_minutes', 0);
-            uw.$('#refresh_status').text('Desativado').css('color', '#dc3545');
+            uw.$('#refresh_status').text('Desativado').css('color', '#f8f9fa');
             uw.$('#refresh_countdown').text('');
             return;
         }
@@ -48,7 +48,7 @@ var StatusPanel = class extends MultUtil {
         this._refreshMinutes = val;
         this.storage.save('refresh_minutes', val);
         this._scheduleRefresh();
-        uw.$('#refresh_status').text(`Recarrega a cada ${val} min`).css('color', '#28a745');
+        uw.$('#refresh_status').text(`Recarrega a cada ${val} min`).css('color', '#f8f9fa');
 
         this.console.log(`[StatusPanel] Auto Refresh: ${val} minuto(s) (± jitter).`);
     };
@@ -82,10 +82,10 @@ var StatusPanel = class extends MultUtil {
         this._countdownInterval = setInterval(() => this._updateCountdown(), 1000);
 
         if (this._refreshMinutes > 0 && this._nextRefreshAt) {
-            uw.$('#refresh_status').text(`Recarrega a cada ${this._refreshMinutes} min`).css('color', '#28a745');
+            uw.$('#refresh_status').text(`Recarrega a cada ${this._refreshMinutes} min`).css('color', '#f8f9fa');
         } else if (this._refreshMinutes > 0) {
             this._scheduleRefresh();
-            uw.$('#refresh_status').text(`Recarrega a cada ${this._refreshMinutes} min`).css('color', '#28a745');
+            uw.$('#refresh_status').text(`Recarrega a cada ${this._refreshMinutes} min`).css('color', '#f8f9fa');
         }
         this._updateCountdown();
     }
@@ -138,7 +138,7 @@ var StatusPanel = class extends MultUtil {
             rows.push(this._row('📚', 'Auto Pesquisa', researchActive, researchActive ? 'Ativo' : 'Parado', 'autoResearch', 'toggle'));
 
             let html = `
-            <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #dee2e6;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #dee2e6;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);background:transparent;">
                 <thead>
                     <tr style="background:#1a5276;border-bottom:2px solid #1a5276;">
                         <th style="text-align:left;padding:10px 14px;color:#f8f9fa;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Módulo</th>
@@ -166,11 +166,11 @@ var StatusPanel = class extends MultUtil {
         const statusDot = active ? '●' : '○';
         const statusText = active ? 'Ativo' : 'Parado';
 
-        const bgColor = active ? '#f0fff4' : '#ffffff';
+        const bgColor = active ? 'rgba(40,167,69,0.06)' : 'transparent';
         const borderColor = active ? '#28a745' : '#e9ecef';
 
         const btn = onclick
-            ? `<div class="button_new ${active ? '' : 'disabled'}" onclick="${onclick}" style="cursor:pointer;margin:0;padding:3px 12px;min-height:26px;display:inline-block;border:1px solid ${active ? '#28a745' : '#dee2e6'};border-radius:4px;background:${active ? '#28a745' : '#fff'};">
+            ? `<div class="button_new ${active ? '' : 'disabled'}" onclick="${onclick}" style="cursor:pointer;margin:0;padding:3px 12px;min-height:26px;display:inline-block;border:1px solid ${active ? '#28a745' : '#dee2e6'};border-radius:4px;background:${active ? '#28a745' : 'transparent'};">
                 <div class="left"></div><div class="right"></div>
                 <div class="caption js-caption" style="font-size:10px;padding:0 6px;color:${active ? '#fff' : '#6c757d'};font-weight:500;">${active ? 'Desligar' : 'Ligar'}<div class="effect js-effect"></div></div>
                </div>`
@@ -178,17 +178,17 @@ var StatusPanel = class extends MultUtil {
 
         return `
         <tr style="border-bottom:1px solid ${borderColor};background:${bgColor};transition:background 0.15s ease;">
-            <td style="padding:8px 14px;color:#495057;display:flex;align-items:center;gap:10px;">
+            <td style="padding:8px 14px;color:#495057;display:flex;align-items:center;gap:10px;background:transparent;">
                 <span style="font-size:16px;opacity:0.7;">${icon}</span>
                 <span style="font-weight:500;font-size:12px;color:#495057;">${label}</span>
             </td>
-            <td style="padding:8px 14px;">
+            <td style="padding:8px 14px;background:transparent;">
                 <span style="color:${statusColor};font-weight:${active ? '600' : '400'};font-size:12px;">
                     ${statusDot} ${statusText}
                 </span>
                 <span style="color:#6c757d;font-size:10px;margin-left:8px;">${value}</span>
             </td>
-            <td style="padding:8px 14px;text-align:right;">
+            <td style="padding:8px 14px;text-align:right;background:transparent;">
                 ${btn}
             </td>
         </tr>`;

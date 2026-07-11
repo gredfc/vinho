@@ -1,7 +1,6 @@
 // ══════════════════════════════════════════════════════
 //  MODULE: AutoDodge - Versão com Lógica Herald SO
-//  Substitui completamente a lógica original do AutoDodge
-//  pela lógica do Herald SO (agrupamento, envio separado)
+//  Integrado na aba "Attack" do MultBot
 // ══════════════════════════════════════════════════════
 var AutoDodge = class extends MultUtil {
     // ═══════════════════════════════════════════════════════════════════════
@@ -96,7 +95,7 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🎨 INTERFACE DO MÓDULO
+    // 🎨 INTERFACE DO MÓDULO - INTEGRADO NA ABA ATTACK
     // ═══════════════════════════════════════════════════════════════════════
 
     settings = () => {
@@ -126,9 +125,20 @@ var AutoDodge = class extends MultUtil {
                 <div class="game_border_corner corner3"></div>
                 <div class="game_border_corner corner4"></div>
                 
-                ${this.getTitleHtml('dodge_title', '🛡️ Auto Dodge (Herald SO)', this.toggle, '', this._active)}
+                ${this.getTitleHtml('dodge_title', '🛡️ Dodge Automático (Herald SO)', this.toggle, '', this._active)}
                 
+                <!-- ATAQUES DETECTADOS -->
                 <div style="padding:5px 10px;font-weight:bold;font-size:12px;color:#a29bfe;border-bottom:1px solid #333;">
+                    ⚔️ ATAQUES DETECTADOS
+                </div>
+                <div id="dodge_attacks_list" style="padding:5px 10px;max-height:200px;overflow-y:auto;min-height:50px;">
+                    <div style="color:#666;font-size:11px;text-align:center;padding:10px;">
+                        🔍 Aguardando ataques...
+                    </div>
+                </div>
+                
+                <!-- CONFIGURAÇÃO DE CIDADES -->
+                <div style="padding:5px 10px;font-weight:bold;font-size:12px;color:#a29bfe;border-top:1px solid #333;border-bottom:1px solid #333;">
                     ⚙️ CIDADES PROTEGIDAS (cidade atacada → destino)
                 </div>
                 
@@ -143,6 +153,7 @@ var AutoDodge = class extends MultUtil {
                     <button onclick="window.dodge_clearAll()" style="background:#ff6b6b;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">🗑️ Limpar Tudo</button>
                 </div>
                 
+                <!-- CONFIGURAÇÕES AVANÇADAS -->
                 <div style="padding:5px 10px;border-top:1px solid #333;margin-top:5px;">
                     <div style="font-size:10px;color:#888;">⚙️ Configurações Avançadas</div>
                     <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;margin-top:3px;">
@@ -153,12 +164,74 @@ var AutoDodge = class extends MultUtil {
                     </div>
                 </div>
                 
-                <div id="dodge_log" style="padding:2px 10px 8px;font-size:11px;color:#5a3a0a;min-height:16px;">
+                <div id="dodge_log" style="padding:2px 10px 8px;font-size:11px;color:#5a3a0a;min-height:16px;border-top:1px solid #333;margin-top:5px;">
                     🛡️ Sistema Herald SO - ${Object.keys(this.CIDADES).length} cidades protegidas
                 </div>
             </div>
         `;
     };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 📋 ATUALIZAR LISTA DE ATAQUES
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _updateAttacksList() {
+        const container = document.getElementById('dodge_attacks_list');
+        if (!container) return;
+
+        const now = Math.floor(Date.now() / 1000);
+        let html = '';
+
+        // Coletar grupos ativos
+        const groups = [];
+        for (const [key, data] of this._dodgeState.groupStatus) {
+            if (data && data.lastTime > now - 10) {
+                groups.push(data);
+            }
+        }
+
+        if (groups.length === 0) {
+            html = `
+                <div style="color:#666;font-size:11px;text-align:center;padding:10px;">
+                    🛡️ Nenhum ataque detectado
+                </div>
+            `;
+        } else {
+            groups.sort((a, b) => a.firstTime - b.firstTime);
+            
+            for (const data of groups) {
+                const timeLeft = Math.round(data.firstTime - now);
+                const timeStr = timeLeft > 0 ? 
+                    (timeLeft > 60 ? Math.round(timeLeft / 60) + 'm ' + (timeLeft % 60) + 's' : timeLeft + 's') : 
+                    '💥 AGORA';
+                
+                const isGroup = data.isGroup;
+                const statusMap = {
+                    'waiting': '⏳ Aguardando',
+                    'dodged': '🌀 Desviado',
+                    'cancelled': '✅ Voltou',
+                    'failed': '❌ Falhou'
+                };
+                const statusText = statusMap[data.status] || '⏳ Aguardando';
+                const statusColor = data.status === 'dodged' ? '#00b894' : 
+                                   data.status === 'cancelled' ? '#fdcb6e' :
+                                   data.status === 'failed' ? '#ff6b6b' : '#74b9ff';
+
+                html += `
+                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px 10px;padding:4px 8px;margin:3px 0;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-size:11px;">
+                        <span style="font-weight:600;color:#ddd;">🏙️ ${data.townId}</span>
+                        <span style="color:#888;font-size:9px;">→ ${data.destino}</span>
+                        ${isGroup ? `<span style="font-size:8px;padding:1px 8px;border-radius:10px;background:#fdcb6e;color:#000;font-weight:700;">📦 ${data.attacks.length} ataques</span>` : ''}
+                        <span style="${timeLeft < 5 && timeLeft > 0 ? 'color:#ff6b6b;font-weight:700;' : timeLeft < 15 && timeLeft > 0 ? 'color:#fdcb6e;font-weight:700;' : 'color:#888;'}">⏱️ ${timeStr}</span>
+                        <span style="color:#666;font-size:9px;">${new Date(data.firstTime * 1000).toLocaleTimeString()}</span>
+                        <span style="font-size:8px;padding:2px 10px;border-radius:10px;background:rgba(116,185,255,0.15);color:${statusColor};">${statusText}</span>
+                    </div>
+                `;
+            }
+        }
+
+        container.innerHTML = html;
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // 🎮 MÉTODOS DE CONTROLE EXPORTADOS PARA O WINDOW
@@ -237,6 +310,8 @@ var AutoDodge = class extends MultUtil {
             self._dodgeState.executedGroups.clear();
             self._troopsSent.clear();
             self._attackCommands.clear();
+            
+            self._updateAttacksList();
             
             const log = document.getElementById('dodge_log');
             if (log) {
@@ -353,7 +428,10 @@ var AutoDodge = class extends MultUtil {
         
         this._setupWindowMethods();
         this._scanAttacks();
-        this._intervalId = this.createGuardedInterval(() => this._scanAttacks(), this.CONFIG.INTERVALO_REFRESH_ATAQUES * 1000);
+        this._intervalId = this.createGuardedInterval(() => {
+            this._scanAttacks();
+            this._updateAttacksList();
+        }, this.CONFIG.INTERVALO_REFRESH_ATAQUES * 1000);
         this._setupIslandScraper();
         
         const log = document.getElementById('dodge_log');
@@ -361,6 +439,8 @@ var AutoDodge = class extends MultUtil {
             log.textContent = '🟢 Sistema ativo - Monitorando ' + Object.keys(this.CIDADES).length + ' cidades';
             log.style.color = '#00b894';
         }
+        
+        this._updateAttacksList();
     }
 
     stop() {
@@ -399,6 +479,8 @@ var AutoDodge = class extends MultUtil {
             log.textContent = '🔴 Sistema desativado';
             log.style.color = '#ff6b6b';
         }
+        
+        this._updateAttacksList();
     }
 
     _updateTitle() {
@@ -643,6 +725,7 @@ var AutoDodge = class extends MultUtil {
                 if (this._dodgeState.groupStatus.has(groupKey)) {
                     this._dodgeState.groupStatus.get(groupKey).status = 'failed';
                 }
+                this._updateAttacksList();
                 return;
             }
 
@@ -687,12 +770,14 @@ var AutoDodge = class extends MultUtil {
             }
 
             this.console.log('[AutoDodge] ✅ Dodge executado para ' + groupKey + '!');
+            this._updateAttacksList();
 
         } catch(e) {
             this.console.log('[AutoDodge] ❌ Erro ao executar dodge: ' + e.message);
             if (this._dodgeState.groupStatus.has(groupKey)) {
                 this._dodgeState.groupStatus.get(groupKey).status = 'failed';
             }
+            this._updateAttacksList();
         }
     }
 
@@ -793,6 +878,8 @@ var AutoDodge = class extends MultUtil {
                         log.textContent = '✅ Tropas ' + typeLabel + ' retornando!';
                         log.style.color = '#00b894';
                     }
+                    
+                    this._updateAttacksList();
                 } else {
                     this.console.log('[AutoDodge] ❌ Erro ao cancelar ' + typeLabel + ': ' + JSON.stringify(res));
                 }

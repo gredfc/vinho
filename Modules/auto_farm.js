@@ -1,4 +1,4 @@
-class AutoFarm extends ModernUtil {
+class AutoFarm extends MultUtil {
     constructor(c, s) {
         super(c, s);
 
@@ -19,28 +19,28 @@ class AutoFarm extends ModernUtil {
 
         this.timer = 0;
         this.lastTime = Date.now();
-        if (this.active) this.active = setInterval(this.main, 1000);
+        if (this.active) this.active = setInterval(this.main, 5000);
     }
 
     /* Create the dropdown menu */
     createDropdown = () => {
-        this.$content = $("<div></div>")
-        this.$title = $("<p>Modern Farm</p>").css({ "text-align": "center", "margin": "2px", "font-weight": "bold", "font-size": "16px" })
+        this.$content = uw.$("<div></div>")
+        this.$title = uw.$("<p>Modern Farm</p>").css({ "text-align": "center", "margin": "2px", "font-weight": "bold", "font-size": "16px" })
         this.$content.append(this.$title)
 
-        this.$duration = $("<p>Duration:</p>").css({ "text-align": "left", "margin": "2px", "font-weight": "bold" })
+        this.$duration = uw.$("<p>Duration:</p>").css({ "text-align": "left", "margin": "2px", "font-weight": "bold" })
         this.$button5 = this.createButton("modern_farm_5", "5 min", this.toggleDuration)
         this.$button10 = this.createButton("modern_farm_10", "10 min", this.toggleDuration)
         this.$button20 = this.createButton("modern_farm_20", "20 min", this.toggleDuration)
         this.$content.append(this.$duration, this.$button5, this.$button10, this.$button20)
 
-        this.$storage = $("<p>Storage:</p>").css({ "text-align": "left", "margin": "2px", "font-weight": "bold" })
+        this.$storage = uw.$("<p>Storage:</p>").css({ "text-align": "left", "margin": "2px", "font-weight": "bold" })
         this.$button80 = this.createButton("modern_farm_80", "80%", this.toggleStorage).css({ "width": "70px" })
         this.$button90 = this.createButton("modern_farm_90", "90%", this.toggleStorage).css({ "width": "80px" })
         this.$button100 = this.createButton("modern_farm_100", "100%", this.toggleStorage).css({ "width": "80px" })
         this.$content.append(this.$storage, this.$button80, this.$button90, this.$button100)
 
-        this.$gui = $("<p>Gui:</p>").css({ "text-align": "left", "margin": "2px", "font-weight": "bold" })
+        this.$gui = uw.$("<p>Gui:</p>").css({ "text-align": "left", "margin": "2px", "font-weight": "bold" })
         this.$guiOn = this.createButton("modern_farm_gui_on", "ON", this.toggleGui)
         this.$guiOff = this.createButton("modern_farm_gui_off", "OFF", this.toggleGui)
         this.$content.append(this.$gui, this.$guiOn, this.$guiOff)
@@ -163,11 +163,12 @@ class AutoFarm extends ModernUtil {
             // Check the min percent for each town
             const { wood, stone, iron, storage } = uw.ITowns.getTown(id).resources();
             minResource = Math.min(wood, stone, iron);
-            min_percent = minResource / storage;
+            min_percent = storage > 0 ? minResource / storage : 0;
+
+            if (min_percent < this.percent) continue;
 
             islands_list.add(island_id);
             polis_list.push(town.id);
-            // if (min_percent < this.percent) continue;
         }
 
         return polis_list;
@@ -181,7 +182,7 @@ class AutoFarm extends ModernUtil {
         }
         else {
             this.updateTimer();
-            this.active = setInterval(this.main, 1000);
+            this.active = setInterval(this.main, 5000);
         }
 
         // Save the settings
@@ -190,7 +191,9 @@ class AutoFarm extends ModernUtil {
 
     /* return the time before the next collection */
     getNextCollection = () => {
-        const { models } = uw.MM.getCollections().FarmTownPlayerRelation[0];
+        const collection = uw.MM.getOnlyCollectionByName('FarmTownPlayerRelation');
+        const models = collection?.models ?? [];
+        if (models.length === 0) return 0;
 
         const lootCounts = {};
         for (const model of models) {
@@ -229,28 +232,42 @@ class AutoFarm extends ModernUtil {
 
         // If the captain is active, claim all the resources at once and fake the opening
         if (isCaptainActive && !this.gui) {
-            await this.fakeOpening();
-            await this.sleep(Math.random() * 2000 + 1000); // random between 1 second and 3
-            await this.fakeSelectAll();
-            await this.sleep(Math.random() * 2000 + 1000);
-            if (this.timing <= 600_000) await this.claimMultiple(300, 600);
-            if (this.timing > 600_000) await this.claimMultiple(1200, 2400);
-            await this.fakeUpdate();
+            try {
+                await this.fakeOpening();
+                await this.sleep(Math.random() * 2000 + 1000);
+                await this.fakeSelectAll();
+                await this.sleep(Math.random() * 2000 + 1000);
+                if (this.timing <= 600_000) await this.claimMultiple(300, 600);
+                if (this.timing > 600_000) await this.claimMultiple(1200, 2400);
+                await this.fakeUpdate();
 
-            setTimeout(() => uw.WMap.removeFarmTownLootCooldownIconAndRefreshLootTimers(), 2000);
-            return;
+                setTimeout(() => uw.WMap.removeFarmTownLootCooldownIconAndRefreshLootTimers(), 2000);
+                return;
+            } catch (e) {
+                this.console.log('[AutoFarm] Caminho do Captain falhou (' + (e?.message ?? e) + '), usando coleta individual como alternativa.');
+            }
         }
 
         if (isCaptainActive && this.gui) {
-            await this.fakeGuiUpdate();
-            return;
+            try {
+                await this.fakeGuiUpdate();
+                return;
+            } catch (e) {
+                this.console.log('[AutoFarm] Caminho do Captain (GUI) falhou (' + (e?.message ?? e) + '), usando coleta individual como alternativa.');
+            }
         }
 
-        // If the captain is not active, claim the resources one by one, but limit the number of claims
+        // If the captain is not active (or the captain path failed above), claim the resources one by one
+        await this._claimOneByOne(polis_list);
+    };
+
+    /* Coleta cidade a cidade, respeitando o limite de 60 por ciclo */
+    _claimOneByOne = async (polis_list) => {
         let max = 60;
         const { models: player_relation_models } = uw.MM.getOnlyCollectionByName('FarmTownPlayerRelation');
         const { models: farm_town_models } = uw.MM.getOnlyCollectionByName('FarmTown');
         const now = Math.floor(Date.now() / 1000);
+        
         for (let town_id of polis_list) {
             let town = uw.ITowns.towns[town_id];
             let x = town.getIslandCoordinateX();
@@ -265,7 +282,7 @@ class AutoFarm extends ModernUtil {
                     if (relation.attributes.relation_status !== 1) continue;
                     if (relation.attributes.lootable_at !== null && now < relation.attributes.lootable_at) continue;
 
-                    this.claimSingle(town_id, relation.attributes.farm_town_id, relation.id, Math.ceil(this.timing / 600_000));
+                    await this.claimSingle(town_id, relation.attributes.farm_town_id, relation.id, Math.ceil(this.timing / 600_000));
                     await this.sleep(500);
                     if (!max) return;
                     else max -= 1;
@@ -300,36 +317,35 @@ class AutoFarm extends ModernUtil {
     };
 
     main = async () => {
-        // Check that the timer is not too high
-        const next_collection = this.getNextCollection();
-        if (next_collection && (this.timer > next_collection + 60 * 1_000 || this.timer < next_collection)) {
-            this.timer = next_collection + Math.floor(Math.random() * 20_000) + 10_000;
+        if (window.__multbot_captcha_active) return;
+        try {
+            const next_collection = this.getNextCollection();
+            if (next_collection && (this.timer > next_collection + 60 * 1_000 || this.timer < next_collection)) {
+                this.timer = next_collection + Math.floor(Math.random() * 20_000) + 10_000;
+            }
+
+            if (this.timer < 1) {
+                this.polis_list = this.generateList();
+                clearInterval(this.active);
+                this.active = null;
+
+                await this.claim();
+                this.active = setInterval(this.main, 5000);
+
+                const rand = Math.floor(Math.random() * 20_000) + 10_000;
+                this.timer = this.timing + rand;
+                if (this.timer < next_collection) this.timer = next_collection + rand;
+            }
+
+            this.updateTimer();
+        } catch (e) {
+            this.console.log('[AutoFarm] Erro no main(): ' + (e?.message ?? e));
+            if (!this.active) this.active = setInterval(this.main, 5000);
         }
-
-        // Claim resources when timer has passed
-        if (this.timer < 1) {
-            // Generate the list of polis and claim resources
-            this.polis_list = this.generateList();
-
-            // Claim the resources, stop the interval and restart it
-            clearInterval(this.active);
-            this.active = null;
-
-            await this.claim();
-            this.active = setInterval(this.main, 1000);
-
-            // Set the new timer 
-            const rand = Math.floor(Math.random() * 20_000) + 10_000;
-            this.timer = this.timing + rand;
-            if (this.timer < next_collection) this.timer = next_collection + rand;
-        }
-
-        // update the timer
-        this.updateTimer();
     };
 
     /* Claim resources from a single polis */
-    claimSingle = (town_id, farm_town_id, relation_id, option = 1) => {
+    claimSingle = async (town_id, farm_town_id, relation_id, option = 1) => {
         const data = {
             model_url: `FarmTownPlayerRelation/${relation_id}`,
             action_name: 'claim',
@@ -340,86 +356,114 @@ class AutoFarm extends ModernUtil {
             },
             town_id: town_id,
         };
-        uw.gpAjax.ajaxPost('frontend_bridge', 'execute', data);
+        try {
+            await this.ajaxPostWithTimeout('frontend_bridge', 'execute', data);
+        } catch (e) {
+            this.console.log('[AutoFarm] Erro ao coletar rural: ' + (e?.message ?? e));
+        }
     };
 
     /* Claim resources from multiple polis */
-    claimMultiple = (base = 300, boost = 600) =>
-        new Promise((myResolve, myReject) => {
-            const polis_list = this.generateList();
-            let data = {
-                towns: polis_list,
-                time_option_base: base,
-                time_option_booty: boost,
-                claim_factor: 'normal',
-            };
-            uw.gpAjax.ajaxPost('farm_town_overviews', 'claim_loads_multiple', data, false, () => myResolve());
-        });
+    claimMultiple = async (base = 300, boost = 600) => {
+        const polis_list = this.generateList();
+        const data = {
+            towns: polis_list,
+            time_option_base: base,
+            time_option_booty: boost,
+            claim_factor: 'normal',
+            town_id: uw.ITowns.getCurrentTown().id,
+            nl_init: true,
+        };
+        try {
+            await this.ajaxPostWithTimeout('farm_town_overviews', 'claim_loads_multiple', data, 45000);
+        } catch (e) {
+            this.console.log('[AutoFarm] Erro em claimMultiple: ' + (e?.message ?? e));
+            throw e;
+        }
+    };
 
     /* Pretend that the window it's opening */
-    fakeOpening = () =>
-        new Promise((myResolve, myReject) => {
-            uw.gpAjax.ajaxGet('farm_town_overviews', 'index', {}, false, async () => {
-                await this.sleep(10);
-                await this.fakeUpdate();
-                myResolve();
+    fakeOpening = async () => {
+        try {
+            const town_id = uw.ITowns.getCurrentTown().id;
+            await this.ajaxGetWithTimeout('farm_town_overviews', 'index', { 
+                town_id: town_id, 
+                nl_init: true 
             });
-        });
+            await this.sleep(10);
+            await this.fakeUpdate();
+        } catch (e) {
+            this.console.log('[AutoFarm] Erro em fakeOpening: ' + (e?.message ?? e));
+            throw e;
+        }
+    };
 
     /* Fake the user selecting the list */
-    fakeSelectAll = () =>
-        new Promise((myResolve, myReject) => {
-            const data = {
-                town_ids: this.polislist,
-            };
-            uw.gpAjax.ajaxGet('farm_town_overviews', 'get_farm_towns_from_multiple_towns', data, false, () => myResolve());
-        });
+    fakeSelectAll = async () => {
+        const data = {
+            town_ids: this.polis_list,
+            town_id: uw.ITowns.getCurrentTown().id,
+            nl_init: true,
+        };
+        try {
+            await this.ajaxGetWithTimeout('farm_town_overviews', 'get_farm_towns_from_multiple_towns', data);
+        } catch (e) {
+            this.console.log('[AutoFarm] Erro em fakeSelectAll: ' + (e?.message ?? e));
+            throw e;
+        }
+    };
 
     /* Fake the window update*/
-    fakeUpdate = () =>
-        new Promise((myResolve, myReject) => {
-            const town = uw.ITowns.getCurrentTown();
-            const { attributes: booty } = town.getResearches();
-            const { attributes: trade_office } = town.getBuildings();
-            const data = {
-                island_x: town.getIslandCoordinateX(),
-                island_y: town.getIslandCoordinateY(),
-                current_town_id: town.id,
-                booty_researched: booty ? 1 : 0,
-                diplomacy_researched: '',
-                trade_office: trade_office ? 1 : 0,
-            };
-            uw.gpAjax.ajaxGet('farm_town_overviews', 'get_farm_towns_for_town', data, false, () => myResolve());
-        });
+    fakeUpdate = async () => {
+        const town = uw.ITowns.getCurrentTown();
+        const { attributes: booty } = town.getResearches();
+        const { attributes: trade_office } = town.getBuildings();
+        const data = {
+            island_x: town.getIslandCoordinateX(),
+            island_y: town.getIslandCoordinateY(),
+            current_town_id: town.id,
+            booty_researched: booty ? 1 : 0,
+            diplomacy_researched: '',
+            trade_office: trade_office ? 1 : 0,
+            town_id: town.id,
+            nl_init: true,
+        };
+        try {
+            await this.ajaxGetWithTimeout('farm_town_overviews', 'get_farm_towns_for_town', data);
+        } catch (e) {
+            this.console.log('[AutoFarm] Erro em fakeUpdate: ' + (e?.message ?? e));
+            throw e;
+        }
+    };
 
     /* Fake the gui update */
     fakeGuiUpdate = () =>
         new Promise(async (myResolve, myReject) => {
             // Open the farm town overview
-            $(".toolbar_button.premium .icon").trigger('mouseenter')
+            uw.$(".toolbar_button.premium .icon").trigger('mouseenter')
             await this.sleep(1019.39, 127.54)
 
             // Click on the farm town overview
-            $(".farm_town_overview a").trigger('click')
+            uw.$(".farm_town_overview a").trigger('click')
             await this.sleep(1156.65, 165.62)
 
             // Select all the polis
-            $(".checkbox.select_all").trigger("click")
+            uw.$(".checkbox.select_all").trigger("click")
             await this.sleep(1036.20, 135.69)
 
             // Claim the resources
-            $("#fto_claim_button").trigger("click")
+            uw.$("#fto_claim_button").trigger("click")
             await this.sleep(1036.20, 135.69)
 
             // Confirm the claim if needed
-            const el = $(".confirmation .btn_confirm.button_new")
+            const el = uw.$(".confirmation .btn_confirm.button_new")
             if (el.length) {
                 el.trigger("click")
                 await this.sleep(1036.20, 135.69)
             }
 
             // Close the window
-            $(".icon_right.icon_type_speed.ui-dialog-titlebar-close").trigger("click")
+            uw.$(".icon_right.icon_type_speed.ui-dialog-titlebar-close").trigger("click")
             myResolve();
         });
 }

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════
 //  MODULE: StatusPanel
 //  Painel de status em tempo real de todos os módulos
-//  Design elegante e moderno
+//  Design elegante com letras cinzentas
 // ══════════════════════════════════════════════════════
 
 var StatusPanel = class extends MultUtil {
@@ -22,12 +22,12 @@ var StatusPanel = class extends MultUtil {
         requestAnimationFrame(() => this._startVisuals());
         return `
         <div style="padding:8px 12px;background:linear-gradient(135deg, #1a1a2e, #16213e);border-radius:8px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid rgba(255,255,255,0.05);">
-            <span style="font-weight:bold;font-size:12px;color:#a29bfe;">🔄 Auto Refresh</span>
+            <span style="font-weight:bold;font-size:12px;color:#888;">🔄 Auto Refresh</span>
             <input id="refresh_minutes_input" type="number" min="0" max="999" value="${this._refreshMinutes}"
-                style="width:60px;padding:4px 8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#eee;font-size:12px;" placeholder="min" />
+                style="width:60px;padding:4px 8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#888;font-size:12px;" placeholder="min" />
             ${this.getButtonHtml('btn_set_refresh', 'Aplicar', this._applyRefresh)}
-            <span id="refresh_status" style="font-size:11px;color:#74b9ff;"></span>
-            <span id="refresh_countdown" style="font-size:12px;color:#fdcb6e;font-weight:bold;margin-left:auto;"></span>
+            <span id="refresh_status" style="font-size:11px;color:#888;"></span>
+            <span id="refresh_countdown" style="font-size:12px;color:#888;font-weight:bold;margin-left:auto;"></span>
         </div>
         <div id="status_rows" style="padding:2px;"></div>`;
     };
@@ -40,7 +40,7 @@ var StatusPanel = class extends MultUtil {
         if (!val || val <= 0) {
             this._refreshMinutes = 0;
             this.storage.save('refresh_minutes', 0);
-            uw.$('#refresh_status').text('Desativado').css('color', '#ff6b6b');
+            uw.$('#refresh_status').text('Desativado').css('color', '#888');
             uw.$('#refresh_countdown').text('');
             return;
         }
@@ -48,7 +48,7 @@ var StatusPanel = class extends MultUtil {
         this._refreshMinutes = val;
         this.storage.save('refresh_minutes', val);
         this._scheduleRefresh();
-        uw.$('#refresh_status').text(`Recarrega a cada ${val} min`).css('color', '#00b894');
+        uw.$('#refresh_status').text(`Recarrega a cada ${val} min`).css('color', '#888');
 
         this.console.log(`[StatusPanel] Auto Refresh: ${val} minuto(s) (± jitter).`);
     };
@@ -82,10 +82,10 @@ var StatusPanel = class extends MultUtil {
         this._countdownInterval = setInterval(() => this._updateCountdown(), 1000);
 
         if (this._refreshMinutes > 0 && this._nextRefreshAt) {
-            uw.$('#refresh_status').text(`Recarrega a cada ${this._refreshMinutes} min`).css('color', '#00b894');
+            uw.$('#refresh_status').text(`Recarrega a cada ${this._refreshMinutes} min`).css('color', '#888');
         } else if (this._refreshMinutes > 0) {
             this._scheduleRefresh();
-            uw.$('#refresh_status').text(`Recarrega a cada ${this._refreshMinutes} min`).css('color', '#00b894');
+            uw.$('#refresh_status').text(`Recarrega a cada ${this._refreshMinutes} min`).css('color', '#888');
         }
         this._updateCountdown();
     }
@@ -139,7 +139,7 @@ var StatusPanel = class extends MultUtil {
 
             uw.$('#status_rows').html(rows.join(''));
         } catch(e) {
-            uw.$('#status_rows').html(`<div style="padding:12px;color:#ff6b6b;text-align:center;">❌ ${this.t('error')}: ${e.message}</div>`);
+            uw.$('#status_rows').html(`<div style="padding:12px;color:#888;text-align:center;">❌ ${this.t('error')}: ${e.message}</div>`);
         }
     }
 
@@ -148,30 +148,29 @@ var StatusPanel = class extends MultUtil {
             ? `window.multBot.${module}.${method}()`
             : null;
 
-        const statusColor = active ? '#00b894' : '#636e72';
         const statusText = active ? '● Ativo' : '○ Parado';
 
         const btn = onclick
             ? `<div class="button_new ${active ? '' : 'disabled'}" onclick="${onclick}" style="cursor:pointer;margin:0;padding:2px 10px;min-height:24px;">
                 <div class="left"></div><div class="right"></div>
-                <div class="caption js-caption" style="font-size:10px;padding:0 8px;">${active ? '🟢 Ativo' : '🔴 Parado'}<div class="effect js-effect"></div></div>
+                <div class="caption js-caption" style="font-size:10px;padding:0 8px;color:#888;">${active ? '🟢 Ativo' : '⚪ Parado'}<div class="effect js-effect"></div></div>
                </div>`
-            : `<span style="font-size:11px;color:#636e72;font-weight:300;">—</span>`;
+            : `<span style="font-size:11px;color:#666;font-weight:300;">—</span>`;
 
         return `
         <div style="display:flex;justify-content:space-between;align-items:center;
             padding:6px 10px;margin:2px 0;
-            background:${active ? 'rgba(0,184,148,0.06)' : 'rgba(255,255,255,0.02)'};
+            background:${active ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.01)'};
             border-radius:6px;
-            border-left:3px solid ${active ? '#00b894' : '#636e72'};
+            border-left:3px solid ${active ? '#777' : '#444'};
             transition:all 0.3s ease;">
             <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:16px;opacity:0.8;">${icon}</span>
-                <span style="font-weight:600;font-size:12px;color:#dfe6e9;">${label}</span>
+                <span style="font-size:16px;opacity:0.6;">${icon}</span>
+                <span style="font-weight:600;font-size:12px;color:#999;">${label}</span>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:11px;color:${active ? '#00b894' : '#636e72'};font-weight:${active ? '600' : '300'};">${value}</span>
-                <span style="font-size:10px;color:${statusColor};font-weight:${active ? '600' : '300'};">${statusText}</span>
+                <span style="font-size:11px;color:${active ? '#999' : '#666'};font-weight:${active ? '500' : '300'};">${value}</span>
+                <span style="font-size:10px;color:${active ? '#888' : '#555'};font-weight:${active ? '500' : '300'};">${statusText}</span>
                 ${btn}
             </div>
         </div>`;

@@ -170,9 +170,9 @@ var StatusPanel = class extends MultUtil {
         const borderColor = active ? '#28a745' : '#e9ecef';
 
         const btn = onclick
-            ? `<div class="button_new ${active ? '' : 'disabled'}" onclick="${onclick}" style="cursor:pointer;margin:0;padding:3px 12px;min-height:26px;display:inline-block;border:none;border-radius:4px;background:${active ? '#28a745' : 'transparent'};">
+            ? `<div class="button_new ${active ? '' : 'disabled'}" onclick="${onclick}" style="cursor:pointer;margin:0;padding:3px 12px;min-height:26px;display:inline-block;border:none;border-radius:4px;background:transparent;">
                 <div class="left"></div><div class="right"></div>
-                <div class="caption js-caption" style="font-size:10px;padding:0 6px;color:${active ? '#fff' : '#6c757d'};font-weight:500;">${active ? 'Desligar' : 'Ligar'}<div class="effect js-effect"></div></div>
+                <div class="caption js-caption" style="font-size:10px;padding:0 6px;color:${active ? '#28a745' : '#6c757d'};font-weight:500;">${active ? 'Desligar' : 'Ligar'}<div class="effect js-effect"></div></div>
                </div>`
             : `<span style="font-size:11px;color:#adb5bd;">—</span>`;
 

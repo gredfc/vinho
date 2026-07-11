@@ -689,68 +689,64 @@
     };
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📦 REGISTAR MÓDULO NO MULTBOT - ABA ATAQUE
+    // 📦 REGISTRAR MÓDULO NO MULTBOT - ABA ATAQUE
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Verificar se já existe um módulo registado com este nome
-    var checkAndRegister = function() {
+    // Esperar o MultBot carregar
+    var checkMultBot = setInterval(function() {
         try {
             // Verificar se o MultBot já existe
             if (typeof window.MultBot === 'undefined') {
-                setTimeout(checkAndRegister, 500);
                 return;
             }
 
-            // Verificar se já existe um módulo com o nome AutoDodge
-            var existingModule = null;
-            if (window.MultBot.modules && window.MultBot.modules.AutoDodge) {
-                existingModule = window.MultBot.modules.AutoDodge;
-            }
-
-            // Se já existe e está na categoria errada, remover
-            if (existingModule && existingModule.category !== 'ataque') {
-                delete window.MultBot.modules.AutoDodge;
-                existingModule = null;
-            }
-
-            // Se não existe ou foi removido, registar
-            if (!existingModule) {
-                if (!window.MultBot.modules) {
-                    window.MultBot.modules = {};
-                }
-
-                window.MultBot.modules.AutoDodge = {
-                    name: 'AutoDodge',
-                    category: 'ataque',
-                    order: 1,
-                    settings: function() {
-                        return AutoDodge.settings();
+            // Verificar se o método registerModule existe
+            if (typeof window.MultBot.registerModule === 'undefined') {
+                // Se não existir, criar o método
+                window.MultBot.registerModule = function(name, module) {
+                    if (!this.modules) {
+                        this.modules = {};
                     }
+                    this.modules[name] = module;
+                    console.log('[MultBot] Módulo registado: ' + name);
                 };
-
-                console.log('[AutoDodge] ✅ Módulo registado na aba Ataque!');
-            } else {
-                console.log('[AutoDodge] ✅ Módulo já registado na aba Ataque!');
             }
 
-            // Forçar recarregamento da aba se possível
-            if (window.MultBot.settingsFactory && typeof window.MultBot.settingsFactory.refreshTab === 'function') {
-                window.MultBot.settingsFactory.refreshTab('attack');
+            // Verificar se o método loadModule existe
+            if (typeof window.MultBot.loadModule === 'undefined') {
+                window.MultBot.loadModule = function(name) {
+                    console.log('[MultBot] A carregar módulo: ' + name);
+                };
             }
+
+            clearInterval(checkMultBot);
+
+            // Registrar módulo na aba Ataque
+            window.MultBot.registerModule('AutoDodge', {
+                name: 'AutoDodge',
+                category: 'ataque',
+                order: 1,
+                settings: function() {
+                    return AutoDodge.settings();
+                }
+            });
+
+            console.log('[AutoDodge] ✅ Módulo registado na aba Ataque!');
 
             // Iniciar se estava ativo
             if (AutoDodge._active) {
                 AutoDodge.start();
             }
 
-        } catch(e) {
-            console.log('[AutoDodge] ⚠️ Erro ao registar módulo: ' + e.message);
-            setTimeout(checkAndRegister, 1000);
-        }
-    };
+            // Carregar módulo
+            if (window.MultBot.loadModule) {
+                window.MultBot.loadModule('AutoDodge');
+            }
 
-    // Iniciar registo
-    setTimeout(checkAndRegister, 100);
+        } catch(e) {
+            // Silencioso - tentar novamente
+        }
+    }, 500);
 
     // ═══════════════════════════════════════════════════════════════════════
     // 🚀 INICIALIZAÇÃO

@@ -27,8 +27,10 @@ var MultBot = class {
         this.multTools          = this._safeInit('MultTools', () => new MultTools(this.console, this.storage));
         this.autoQuest          = this._safeInit('AutoQuest', () => new AutoQuest(this.console, this.storage));
         this.autoMilitia        = this._safeInit('AutoMilitia', () => new AutoMilitia(this.console, this.storage));
-        this.autoDodge          = this._safeInit('AutoDodge', () => new AutoDodge(this.console, this.storage));
-        this.autoAttack         = this._safeInit('AutoAttack', () => new AutoAttack(this.console, this.storage));
+        // ⭐ REMOVIDO autoDodge daqui - agora está na aba Ataque
+        // this.autoDodge          = this._safeInit('AutoDodge', () => new AutoDodge(this.console, this.storage));
+        // ⭐ SUBSTITUÍDO autoAttack pelo AutoDodge
+        this.autoAttack         = this._safeInit('AutoDodge', () => new AutoDodge(this.console, this.storage));
         this.autoAresSacrifice  = this._safeInit('AutoAresSacrifice', () => new AutoAresSacrifice(this.console, this.storage));
         this.autoResearch       = this._safeInit('AutoResearch', () => new AutoResearch(this.console, this.storage));
         this.autoSendResources  = this._safeInit('AutoSendResources', () => new AutoSendResources(this.console, this.storage));
@@ -124,20 +126,22 @@ var MultBot = class {
         return html;
     };
 
+    // ⭐ ABA MIX - REMOVIDO autoDodge daqui
     settingsMix = () => {
         let html = '';
         html += this.autoBootcamp ? this.autoBootcamp.settings() : this._missingModuleHtml('Auto Bootcamp');
         html += this.autoParty ? this.autoParty.settings() : this._missingModuleHtml('Auto Party');
         html += this.autoHide ? this.autoHide.settings() : this._missingModuleHtml('Auto Hide');
         html += this.autoMilitia ? this.autoMilitia.settings() : this._missingModuleHtml('Auto Militia');
-        html += this.autoDodge ? this.autoDodge.settings() : this._missingModuleHtml('Auto Dodge');
+        // ⭐ REMOVIDO: html += this.autoDodge ? this.autoDodge.settings() : this._missingModuleHtml('Auto Dodge');
         html += this.autoQuest ? this.autoQuest.settings() : this._missingModuleHtml('Auto Quest');
         return html;
     };
 
+    // ⭐ ABA ATAQUE - AGORA USA AutoDodge (substituindo AutoAttack)
     settingsAttack = () => {
         let html = '';
-        html += this.autoAttack ? this.autoAttack.settings() : this._missingModuleHtml('Auto Attack');
+        html += this.autoAttack ? this.autoAttack.settings() : this._missingModuleHtml('Auto Dodge');
         return html;
     };
 

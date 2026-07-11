@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════
 //  MODULE: StatusPanel
 //  Painel de status em tempo real de todos os módulos
-//  Design profissional com linhas e quadros elegantes
+//  Design profissional com cabeçalho azul oceano
 // ══════════════════════════════════════════════════════
 
 var StatusPanel = class extends MultUtil {
@@ -140,10 +140,10 @@ var StatusPanel = class extends MultUtil {
             let html = `
             <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #dee2e6;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                 <thead>
-                    <tr style="background:#f8f9fa;border-bottom:2px solid #dee2e6;">
-                        <th style="text-align:left;padding:10px 14px;color:#495057;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Módulo</th>
-                        <th style="text-align:left;padding:10px 14px;color:#495057;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Status</th>
-                        <th style="text-align:right;padding:10px 14px;color:#495057;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Ação</th>
+                    <tr style="background:#1a5276;border-bottom:2px solid #1a5276;">
+                        <th style="text-align:left;padding:10px 14px;color:#f8f9fa;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Módulo</th>
+                        <th style="text-align:left;padding:10px 14px;color:#f8f9fa;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Status</th>
+                        <th style="text-align:right;padding:10px 14px;color:#f8f9fa;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Ação</th>
                     </tr>
                 </thead>
                 <tbody>

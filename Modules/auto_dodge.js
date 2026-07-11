@@ -34,6 +34,18 @@ var AutoDodge = class extends MultUtil {
     ISLAND_SCRAPE_DELAY_MS = 400;
     RECALL_CHECK_INTERVAL_MS = 100; // NOVO: verifica a cada 100ms
 
+    // ═══ CIDADES CONFIGURADAS PARA DODGE ═══
+    // Formato: cidade_atacada: cidade_que_envia_suporte
+    CIDADES = {
+        2677: 2470,
+        154: 156,
+        2195: 2280,
+        197: 234,
+        2165: 288,
+        97: 13,
+        2263: 2273,
+    };
+
     constructor(c, s) {
         super(c, s);
         this._active = false;
@@ -44,6 +56,14 @@ var AutoDodge = class extends MultUtil {
         this._islandScraperObserver = null;
 
         this._islandCache = this.storage.load('dodge_island_cache', {});
+
+        // Carregar cidades do storage (sobrescreve as padrão se houver)
+        const savedCidades = this.storage.load('dodge_cidades', null);
+        if (savedCidades && Object.keys(savedCidades).length > 0) {
+            this.CIDADES = savedCidades;
+        } else {
+            this.storage.save('dodge_cidades', this.CIDADES);
+        }
 
         // Reconciliacao de recalls pendentes acontece SEMPRE, mesmo
         // que o modulo esteja desativado - se ha uma tropa em apoio

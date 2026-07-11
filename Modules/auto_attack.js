@@ -1,56 +1,55 @@
 // ══════════════════════════════════════════════════════
-//  MODULE: AutoDodge - Versão com Lógica Herald SO
-//  Integrado na aba "Attack" do MultBot
+//  MODULE: AutoDodge - Versão Herald SO Original
+//  Mantém 100% da lógica do seu script original
+//  SEM LOGS no console do MultBot
 // ══════════════════════════════════════════════════════
 var AutoDodge = class extends MultUtil {
-    // ═══════════════════════════════════════════════════════════════════════
-    // ⚙️ CONFIGURAÇÃO (HERDADA DO HERALD SO)
-    // ═══════════════════════════════════════════════════════════════════════
-    CIDADES = {
-        2677: 2470,
-        154: 156,
-        2195: 2280,
-        197: 234,
-        2165: 288,
-        97: 13,
-        2263: 2273,
-    };
-
-    CONFIG = {
-        TEMPO_ANTECEDENCIA: 4,
-        INTERVALO_REFRESH_ATAQUES: 2,
-        MARGEM_SEGURANCA_RETORNO: 2,
-        DIFERENCA_ENVIO: 0.5,
-        JANELA_GRUPO: 10,
-        MIN_TROOPS_TO_DODGE: 1,
-        MAX_TROOPS_TO_SEND: 1000,
-        SOUND_ALERTS: true,
-        DEBUG: true,
-        AUTO_DODGE: true,
-    };
-
     constructor(c, s) {
         super(c, s);
         this._active = false;
         this._intervalId = null;
         
         // ═══════════════════════════════════════════════════════════════════
-        // ESTADO DO DODGE (HERDADO DO HERALD SO)
+        // ⚙️ CONFIGURAÇÃO (IGUAL AO SEU SCRIPT ORIGINAL)
         // ═══════════════════════════════════════════════════════════════════
-        this._dodgeState = {
-            groupTimers: new Map(),
-            returnTimers: new Map(),
-            groupStatus: new Map(),
-            executedGroups: new Set(),
+        this.CIDADES = {
+            2677: 2470,
+            154: 156,
+            2195: 2280,
+            197: 234,
+            2165: 288,
+            97: 13,
+            2263: 2273,
+        };
+
+        this.CONFIG = {
+            TEMPO_ANTECEDENCIA: 4,
+            INTERVALO_REFRESH_ATAQUES: 2,
+            MARGEM_SEGURANCA_RETORNO: 2,
+            DIFERENCA_ENVIO: 0.5,
+            JANELA_GRUPO: 10,
+            MIN_TROOPS_TO_DODGE: 1,
+            MAX_TROOPS_TO_SEND: 1000,
+            SOUND_ALERTS: true,
+            DEBUG: false,
+            AUTO_DODGE: true,
+        };
+
+        // ═══════════════════════════════════════════════════════════════════
+        // ESTADO DO DODGE (MANTIDO IGUAL AO ORIGINAL)
+        // ═══════════════════════════════════════════════════════════════════
+        this.dodgeState = {
+            groupTimers: {},
+            returnTimers: {},
+            groupStatus: {},
             isScanning: false,
             lastScan: 0,
+            executedGroups: {},
         };
         
-        this._troopsSent = new Set();
-        this._attackCommands = new Map();
+        this.troopsSent = {};
+        this.attackCommands = {};
         this._pendingRecalls = new Map();
-        this._islandScraperObserver = null;
-        this._islandCache = this.storage.load('dodge_island_cache', {});
         
         // Carregar configurações salvas
         this._loadConfig();
@@ -69,33 +68,27 @@ var AutoDodge = class extends MultUtil {
 
     _loadConfig() {
         try {
-            const saved = this.storage.load('dodge_cidades_herald', null);
+            const saved = this.storage.load('dodge_cidades_herald_original', null);
             if (saved && typeof saved === 'object') {
                 this.CIDADES = saved;
-                this.console.log('[AutoDodge] Cidades carregadas:', Object.keys(this.CIDADES).length);
             }
             
-            const configSaved = this.storage.load('dodge_config_herald', null);
+            const configSaved = this.storage.load('dodge_config_herald_original', null);
             if (configSaved && typeof configSaved === 'object') {
                 Object.assign(this.CONFIG, configSaved);
-                this.console.log('[AutoDodge] Configuração carregada');
             }
-        } catch(e) {
-            this.console.log('[AutoDodge] Erro ao carregar config:', e);
-        }
+        } catch(e) {}
     }
 
     _saveConfig() {
         try {
-            this.storage.save('dodge_cidades_herald', this.CIDADES);
-            this.storage.save('dodge_config_herald', this.CONFIG);
-        } catch(e) {
-            this.console.log('[AutoDodge] Erro ao salvar config:', e);
-        }
+            this.storage.save('dodge_cidades_herald_original', this.CIDADES);
+            this.storage.save('dodge_config_herald_original', this.CONFIG);
+        } catch(e) {}
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🎨 INTERFACE DO MÓDULO - INTEGRADO NA ABA ATTACK
+    // 🎨 INTERFACE DO MÓDULO - NA ABA ATTACK
     // ═══════════════════════════════════════════════════════════════════════
 
     settings = () => {
@@ -125,7 +118,7 @@ var AutoDodge = class extends MultUtil {
                 <div class="game_border_corner corner3"></div>
                 <div class="game_border_corner corner4"></div>
                 
-                ${this.getTitleHtml('dodge_title', '🛡️ Dodge Automático (Herald SO)', this.toggle, '', this._active)}
+                ${this.getTitleHtml('dodge_title', '🛡️ Herald SO - Dodge V49.2', this.toggle, '', this._active)}
                 
                 <!-- ATAQUES DETECTADOS -->
                 <div style="padding:5px 10px;font-weight:bold;font-size:12px;color:#a29bfe;border-bottom:1px solid #333;">
@@ -151,6 +144,7 @@ var AutoDodge = class extends MultUtil {
                     <button onclick="window.dodge_saveCities()" style="background:#00b894;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">💾 Salvar</button>
                     <button onclick="window.dodge_autoDetect()" style="background:#fdcb6e;color:#000;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">🔍 Auto Detectar</button>
                     <button onclick="window.dodge_clearAll()" style="background:#ff6b6b;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">🗑️ Limpar Tudo</button>
+                    <button onclick="window.dodge_test()" style="background:#a29bfe;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">🧪 Testar</button>
                 </div>
                 
                 <!-- CONFIGURAÇÕES AVANÇADAS -->
@@ -165,7 +159,7 @@ var AutoDodge = class extends MultUtil {
                 </div>
                 
                 <div id="dodge_log" style="padding:2px 10px 8px;font-size:11px;color:#5a3a0a;min-height:16px;border-top:1px solid #333;margin-top:5px;">
-                    🛡️ Sistema Herald SO - ${Object.keys(this.CIDADES).length} cidades protegidas
+                    🛡️ Herald SO - ${Object.keys(this.CIDADES).length} cidades protegidas
                 </div>
             </div>
         `;
@@ -179,14 +173,16 @@ var AutoDodge = class extends MultUtil {
         const container = document.getElementById('dodge_attacks_list');
         if (!container) return;
 
-        const now = Math.floor(Date.now() / 1000);
+        const now = this._gameNow();
         let html = '';
 
-        // Coletar grupos ativos
         const groups = [];
-        for (const [key, data] of this._dodgeState.groupStatus) {
-            if (data && data.lastTime > now - 10) {
-                groups.push(data);
+        for (const key in this.dodgeState.groupStatus) {
+            if (this.dodgeState.groupStatus.hasOwnProperty(key)) {
+                const data = this.dodgeState.groupStatus[key];
+                if (data && data.lastTime > now - 10) {
+                    groups.push(data);
+                }
             }
         }
 
@@ -234,7 +230,7 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🎮 MÉTODOS DE CONTROLE EXPORTADOS PARA O WINDOW
+    // 🎮 MÉTODOS DE CONTROLE EXPORTADOS
     // ═══════════════════════════════════════════════════════════════════════
 
     _setupWindowMethods() {
@@ -276,7 +272,6 @@ var AutoDodge = class extends MultUtil {
             
             self.CIDADES = newCities;
             self._saveConfig();
-            self.console.log('[AutoDodge] Cidades salvas:', Object.keys(newCities).length);
             
             const log = document.getElementById('dodge_log');
             if (log) {
@@ -296,20 +291,19 @@ var AutoDodge = class extends MultUtil {
         window.dodge_clearAll = function() {
             if (!confirm('🗑️ Limpar todos os ataques e grupos?')) return;
             
-            // Limpar timers
-            for (const timer of self._dodgeState.groupTimers.values()) {
-                clearTimeout(timer);
+            for (const key in self.dodgeState.groupTimers) {
+                clearTimeout(self.dodgeState.groupTimers[key]);
             }
-            for (const timer of self._dodgeState.returnTimers.values()) {
-                clearTimeout(timer);
+            for (const key in self.dodgeState.returnTimers) {
+                clearTimeout(self.dodgeState.returnTimers[key]);
             }
             
-            self._dodgeState.groupStatus.clear();
-            self._dodgeState.groupTimers.clear();
-            self._dodgeState.returnTimers.clear();
-            self._dodgeState.executedGroups.clear();
-            self._troopsSent.clear();
-            self._attackCommands.clear();
+            self.dodgeState.groupStatus = {};
+            self.dodgeState.groupTimers = {};
+            self.dodgeState.returnTimers = {};
+            self.dodgeState.executedGroups = {};
+            self.troopsSent = {};
+            self.attackCommands = {};
             
             self._updateAttacksList();
             
@@ -318,11 +312,12 @@ var AutoDodge = class extends MultUtil {
                 log.textContent = '🗑️ Todos os ataques limpos!';
                 log.style.color = '#fcd34d';
             }
-            
-            self.console.log('[AutoDodge] Todos os ataques limpos');
         };
         
-        // Configurar observer para salvar configurações avançadas
+        window.dodge_test = function() {
+            self._testDodge();
+        };
+        
         const configObserver = new MutationObserver(() => {
             const lead = document.querySelector('.dodge_config_lead');
             const ret = document.querySelector('.dodge_config_return');
@@ -348,10 +343,7 @@ var AutoDodge = class extends MultUtil {
     _autoDetectCities() {
         try {
             const towns = uw.ITowns.towns;
-            if (!towns) {
-                this.console.log('[AutoDodge] Nenhuma cidade encontrada');
-                return;
-            }
+            if (!towns) return;
             
             let detected = 0;
             const newCities = { ...this.CIDADES };
@@ -378,7 +370,6 @@ var AutoDodge = class extends MultUtil {
             
             this.CIDADES = newCities;
             this._saveConfig();
-            this.console.log('[AutoDodge] Detectadas ' + detected + ' cidades');
             
             const log = document.getElementById('dodge_log');
             if (log) {
@@ -391,9 +382,7 @@ var AutoDodge = class extends MultUtil {
             }
             
             this._reloadSettings();
-        } catch(e) {
-            this.console.log('[AutoDodge] Erro na detecção:', e);
-        }
+        } catch(e) {}
     }
 
     _reloadSettings() {
@@ -424,7 +413,6 @@ var AutoDodge = class extends MultUtil {
         this._active = true;
         this.storage.save('dodge_active', true);
         this._updateTitle();
-        this.console.log('[AutoDodge] 🚀 Iniciado com lógica Herald SO!');
         
         this._setupWindowMethods();
         this._scanAttacks();
@@ -432,7 +420,6 @@ var AutoDodge = class extends MultUtil {
             this._scanAttacks();
             this._updateAttacksList();
         }, this.CONFIG.INTERVALO_REFRESH_ATAQUES * 1000);
-        this._setupIslandScraper();
         
         const log = document.getElementById('dodge_log');
         if (log) {
@@ -452,27 +439,24 @@ var AutoDodge = class extends MultUtil {
             this._intervalId = null;
         }
 
-        // Limpar todos os timers
-        for (const timer of this._dodgeState.groupTimers.values()) {
-            clearTimeout(timer);
+        for (const key in this.dodgeState.groupTimers) {
+            clearTimeout(this.dodgeState.groupTimers[key]);
         }
-        for (const timer of this._dodgeState.returnTimers.values()) {
-            clearTimeout(timer);
+        for (const key in this.dodgeState.returnTimers) {
+            clearTimeout(this.dodgeState.returnTimers[key]);
         }
         for (const entry of this._pendingRecalls.values()) {
             clearTimeout(entry.timeoutId);
         }
         
-        this._dodgeState.groupTimers.clear();
-        this._dodgeState.returnTimers.clear();
-        this._dodgeState.groupStatus.clear();
-        this._dodgeState.executedGroups.clear();
-        this._troopsSent.clear();
+        this.dodgeState.groupTimers = {};
+        this.dodgeState.returnTimers = {};
+        this.dodgeState.groupStatus = {};
+        this.dodgeState.executedGroups = {};
+        this.troopsSent = {};
         this._pendingRecalls.clear();
 
-        this._teardownIslandScraper();
         this._updateTitle();
-        this.console.log('[AutoDodge] ⏹️ Parado');
         
         const log = document.getElementById('dodge_log');
         if (log) {
@@ -489,494 +473,106 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🔍 SCAN DE ATAQUES (LÓGICA COMPLETA DO HERALD SO)
+    // 🧪 TESTE
     // ═══════════════════════════════════════════════════════════════════════
 
-    _scanAttacks() {
-        if (!this._active || !this.CONFIG.AUTO_DODGE) return;
-        if (this._dodgeState.isScanning) return;
-        if (window.__multbot_captcha_active) return;
+    _testDodge() {
+        const towns = Object.keys(this.CIDADES);
+        if (towns.length === 0) return;
         
-        const now = Date.now();
-        if (now - this._dodgeState.lastScan < 200) return;
+        const townId = parseInt(towns[0]);
+        const destino = this.CIDADES[townId];
+        const now = this._gameNow();
+
+        const tempos = [10, 11, 24, 27, 40];
+        const attacks = [];
         
-        this._dodgeState.isScanning = true;
-        this._dodgeState.lastScan = now;
+        for (let i = 0; i < tempos.length; i++) {
+            const arrival = now + tempos[i];
+            const key = 'sim_' + Date.now() + '_' + i;
+            attacks.push({
+                cmdId: key,
+                arrival: arrival,
+                type: 'mixed'
+            });
+        }
 
-        try {
-            const models = uw.MM.getModels().MovementsUnits;
-            if (!models) {
-                this._dodgeState.isScanning = false;
-                return;
-            }
-
-            const nowTime = Math.floor(Date.now() / 1000);
-            const towns = uw.ITowns.towns;
-            const cityAttacks = {};
-
-            // 1. COLETAR TODOS OS ATAQUES POR CIDADE
-            for (const key in models) {
-                const mv = models[key].attributes;
-                if (!mv || !mv.target_town_id) continue;
-
-                const targetIsMine = !!towns[mv.target_town_id];
-                const isAttack = mv.type === 'attack' || mv.type === 'attack_with_spy';
-                const isReturn = mv.is_returning === true || mv.home_town_id === mv.target_town_id;
-
-                if (!targetIsMine || !isAttack || isReturn) continue;
-                if (!mv.arrival_at || mv.arrival_at < nowTime) continue;
-
-                const townId = String(mv.target_town_id);
-                if (!this.CIDADES[townId]) continue;
-
-                if (!cityAttacks[townId]) {
-                    cityAttacks[townId] = [];
-                }
-                
-                cityAttacks[townId].push({
-                    cmdId: mv.command_id || key,
-                    arrival: mv.arrival_at,
-                    type: this._detectAttackType(mv)
-                });
-            }
-
-            // 2. AGRUPAR ATAQUES POR CIDADE
-            for (const [townId, attacks] of Object.entries(cityAttacks)) {
-                if (attacks.length === 0) continue;
-                
-                attacks.sort((a, b) => a.arrival - b.arrival);
-                const destino = this.CIDADES[townId];
-                
-                if (!destino) {
-                    this.console.log('[AutoDodge] ⚠️ Cidade ' + townId + ' sem destino configurado!');
-                    continue;
-                }
-
-                // 3. CRIAR GRUPOS
-                const groups = [];
-                let currentGroup = [attacks[0]];
-                
-                for (let i = 1; i < attacks.length; i++) {
-                    const gap = attacks[i].arrival - attacks[i-1].arrival;
-                    if (gap <= this.CONFIG.JANELA_GRUPO) {
-                        currentGroup.push(attacks[i]);
-                    } else {
-                        groups.push(currentGroup);
-                        currentGroup = [attacks[i]];
-                    }
-                }
+        const groups = [];
+        let currentGroup = [attacks[0]];
+        for (let i = 1; i < attacks.length; i++) {
+            const gap = attacks[i].arrival - attacks[i-1].arrival;
+            if (gap <= this.CONFIG.JANELA_GRUPO) {
+                currentGroup.push(attacks[i]);
+            } else {
                 groups.push(currentGroup);
-
-                // 4. PROCESSAR CADA GRUPO
-                for (let g = 0; g < groups.length; g++) {
-                    const group = groups[g];
-                    const firstTime = group[0].arrival;
-                    const lastTime = group[group.length - 1].arrival;
-                    const groupKey = townId + '_group_' + firstTime + '_' + g;
-
-                    if (this._dodgeState.executedGroups.has(groupKey)) continue;
-
-                    const isGroup = group.length > 1;
-                    const timeToFirst = firstTime - nowTime;
-
-                    if (timeToFirst > 60) continue;
-
-                    // ⭐ VERIFICAR SE JÁ EXISTE UM GRUPO PARA ESTA CIDADE E ATUALIZAR
-                    let existingGroupKey = null;
-                    for (const [key, data] of this._dodgeState.groupStatus) {
-                        if (data && data.townId === townId && !data.dodged) {
-                            if (Math.abs(data.lastTime - lastTime) <= this.CONFIG.JANELA_GRUPO) {
-                                existingGroupKey = key;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (existingGroupKey) {
-                        // ⭐ ATUALIZAR GRUPO EXISTENTE
-                        const existingData = this._dodgeState.groupStatus.get(existingGroupKey);
-                        for (const attack of group) {
-                            const exists = existingData.attacks.some(a => a.cmdId === attack.cmdId);
-                            if (!exists) {
-                                existingData.attacks.push(attack);
-                            }
-                        }
-                        existingData.attacks.sort((a, b) => a.arrival - b.arrival);
-                        existingData.firstTime = existingData.attacks[0].arrival;
-                        existingData.lastTime = existingData.attacks[existingData.attacks.length - 1].arrival;
-                        existingData.isGroup = existingData.attacks.length > 1;
-
-                        this.console.log('[AutoDodge] 📦 GRUPO ATUALIZADO para ' + townId + ': ' + existingData.attacks.length + ' ataques');
-
-                        // Reagendar dodge com novo tempo
-                        if (this._dodgeState.groupTimers.has(existingGroupKey)) {
-                            clearTimeout(this._dodgeState.groupTimers.get(existingGroupKey));
-                        }
-
-                        const newDodgeDelay = Math.max(existingData.firstTime - nowTime - this.CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
-                        const timer = setTimeout(() => {
-                            this._executeDodgeGroup(
-                                existingData.townId,
-                                existingData.destino,
-                                existingData.firstTime,
-                                existingData.lastTime,
-                                existingData.attacks,
-                                existingGroupKey,
-                                existingData.isGroup
-                            );
-                        }, newDodgeDelay);
-                        this._dodgeState.groupTimers.set(existingGroupKey, timer);
-
-                        continue;
-                    }
-
-                    // 5. CRIAR NOVO GRUPO
-                    const groupData = {
-                        townId: townId,
-                        destino: destino,
-                        firstTime: firstTime,
-                        lastTime: lastTime,
-                        attacks: group,
-                        isGroup: isGroup,
-                        status: 'waiting',
-                        dodged: false
-                    };
-
-                    this._dodgeState.groupStatus.set(groupKey, groupData);
-
-                    const typeLabel = isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
-                    this.console.log('[AutoDodge] ' + typeLabel + ' para ' + townId + ' (' + group.length + ' ataques)');
-                    this.console.log('[AutoDodge]    ├─ Primeiro: ' + new Date(firstTime * 1000).toLocaleTimeString());
-                    this.console.log('[AutoDodge]    ├─ Último: ' + new Date(lastTime * 1000).toLocaleTimeString());
-                    this.console.log('[AutoDodge]    ├─ ⭐ Enviar ' + this.CONFIG.TEMPO_ANTECEDENCIA + 's ANTES');
-                    this.console.log('[AutoDodge]    └─ Voltar ' + this.CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS');
-
-                    // 6. AGENDAR DODGE
-                    const dodgeDelay = Math.max(firstTime - nowTime - this.CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
-
-                    if (this._dodgeState.groupTimers.has(groupKey)) {
-                        clearTimeout(this._dodgeState.groupTimers.get(groupKey));
-                    }
-
-                    const timer = setTimeout(() => {
-                        this._executeDodgeGroup(townId, destino, firstTime, lastTime, group, groupKey, isGroup);
-                    }, dodgeDelay);
-                    this._dodgeState.groupTimers.set(groupKey, timer);
-                }
+                currentGroup = [attacks[i]];
             }
+        }
+        groups.push(currentGroup);
 
-            // 7. LIMPAR GRUPOS EXPIRADOS
-            this._cleanupExpiredGroups();
+        for (let g = 0; g < groups.length; g++) {
+            const group = groups[g];
+            const firstTime = group[0].arrival;
+            const lastTime = group[group.length - 1].arrival;
+            const groupKey = townId + '_group_' + firstTime + '_' + g;
+            const isGroup = group.length > 1;
 
-        } catch(e) {
-            this.console.log('[AutoDodge] ⚠️ Erro no scan: ' + e.message);
+            this.dodgeState.groupStatus[groupKey] = {
+                townId: townId,
+                destino: destino,
+                firstTime: firstTime,
+                lastTime: lastTime,
+                attacks: group,
+                isGroup: isGroup,
+                status: 'waiting',
+                dodged: false
+            };
+
+            const dodgeDelay = Math.max(firstTime - now - this.CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
+            setTimeout((data, key) => {
+                this._executeDodgeForGroup(data.townId, data.destino, data.firstTime, data.lastTime, data.attacks, key, data.isGroup);
+            }, dodgeDelay, this.dodgeState.groupStatus[groupKey], groupKey);
         }
 
-        this._dodgeState.isScanning = false;
+        this._updateAttacksList();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🧬 DETECTAR TIPO DE ATAQUE
+    // 🔍 FUNÇÕES AUXILIARES (SEM LOGS)
     // ═══════════════════════════════════════════════════════════════════════
 
-    _detectAttackType(attrs) {
-        const navalUnits = ['bireme', 'trireme', 'attack_ship', 'demolition_ship', 'colonize_ship', 'small_transporter', 'big_transporter'];
-        const groundUnits = ['sword', 'archer', 'hoplite', 'slinger', 'rider', 'chariot', 'catapult', 'militia'];
-        
-        if (attrs.type === 'attack_sea' || attrs.type === 'naval_attack') return 'naval';
-        if (attrs.type === 'attack_land' || attrs.type === 'ground_attack') return 'ground';
-        
-        if (attrs.units) {
-            let hasNaval = false, hasGround = false;
-            for (const u in attrs.units) {
-                if (navalUnits.indexOf(u) !== -1) hasNaval = true;
-                else if (groundUnits.indexOf(u) !== -1) hasGround = true;
-            }
-            if (hasNaval && !hasGround) return 'naval';
-            if (hasGround && !hasNaval) return 'ground';
-            if (hasNaval && hasGround) return 'mixed';
-        }
-        
-        return 'mixed';
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // ⚡ EXECUTAR DODGE PARA UM GRUPO (LÓGICA COMPLETA DO HERALD SO)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _executeDodgeGroup(townId, destino, firstTime, lastTime, attacks, groupKey, isGroup) {
+    _gameNow() {
         try {
-            if (this._dodgeState.executedGroups.has(groupKey)) {
-                this.console.log('[AutoDodge] ℹ️ Grupo ' + groupKey + ' já executado');
-                return;
+            if (typeof unsafeWindow !== 'undefined' && unsafeWindow.Timestamp && unsafeWindow.Timestamp.server) {
+                return unsafeWindow.Timestamp.server();
             }
-
-            const town = uw.ITowns.towns[townId];
-            if (!town) return;
-            
-            const townName = town.getName ? town.getName() : ('#' + townId);
-            
-            // Obter tropas
-            const troops = this._getUnitsFromTown(townId);
-            const totalTroops = Object.values(troops).reduce((a, b) => a + b, 0);
-            
-            if (totalTroops < this.CONFIG.MIN_TROOPS_TO_DODGE) {
-                this.console.log('[AutoDodge] ⚠️ Tropas insuficientes em ' + townName + ': ' + totalTroops);
-                if (this._dodgeState.groupStatus.has(groupKey)) {
-                    this._dodgeState.groupStatus.get(groupKey).status = 'failed';
-                }
-                this._updateAttacksList();
-                return;
-            }
-
-            const typeLabel = isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
-            const numAttacks = attacks.length;
-            this.console.log('[AutoDodge] ⚡ EXECUTANDO DODGE ' + typeLabel + ' para ' + townName + ' (' + numAttacks + ' ataques)');
-            this.console.log('[AutoDodge] ⏱️ Primeiro ataque: ' + new Date(firstTime * 1000).toLocaleTimeString());
-            this.console.log('[AutoDodge] ⏱️ Último ataque: ' + new Date(lastTime * 1000).toLocaleTimeString());
-            this.console.log('[AutoDodge] ⏱️ Enviar ' + this.CONFIG.TEMPO_ANTECEDENCIA + 's ANTES');
-            this.console.log('[AutoDodge] ⏱️ Voltar ' + this.CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS');
-            
-            this._playSound('danger');
-
-            this._dodgeState.executedGroups.add(groupKey);
-            if (this._dodgeState.groupStatus.has(groupKey)) {
-                this._dodgeState.groupStatus.get(groupKey).dodged = true;
-                this._dodgeState.groupStatus.get(groupKey).status = 'dodged';
-            }
-
-            // ENVIAR TERRESTRES
-            const landUnits = this._filterUnits(troops, false);
-            if (Object.keys(landUnits).length > 0) {
-                this._sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'ground', landUnits);
-            } else {
-                this.console.log('[AutoDodge] ⚠️ Nenhuma unidade terrestre disponível');
-            }
-
-            // ENVIAR NAVAIS COM DELAY
-            const navalUnits = this._filterUnits(troops, true);
-            if (Object.keys(navalUnits).length > 0) {
-                setTimeout(() => {
-                    this._sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'naval', navalUnits);
-                }, this.CONFIG.DIFERENCA_ENVIO * 1000);
-            } else {
-                this.console.log('[AutoDodge] ⚠️ Nenhuma unidade naval disponível');
-            }
-
-            const log = document.getElementById('dodge_log');
-            if (log) {
-                log.textContent = `🛡️ ${townName} evacuada para ${destino}! (${numAttacks} ataques)`;
-                log.style.color = '#00b894';
-            }
-
-            this.console.log('[AutoDodge] ✅ Dodge executado para ' + groupKey + '!');
-            this._updateAttacksList();
-
-        } catch(e) {
-            this.console.log('[AutoDodge] ❌ Erro ao executar dodge: ' + e.message);
-            if (this._dodgeState.groupStatus.has(groupKey)) {
-                this._dodgeState.groupStatus.get(groupKey).status = 'failed';
-            }
-            this._updateAttacksList();
-        }
+            return Date.now() / 1000;
+        } catch(e) { return Date.now() / 1000; }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // 📤 ENVIAR SUPORTE PARA GRUPO (LÓGICA COMPLETA DO HERALD SO)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _sendSupportForGroup(fromTownId, targetTownId, firstTime, lastTime, groupKey, attackType, units) {
-        const timerKey = groupKey + '_' + attackType;
-
-        if (this._troopsSent.has(timerKey)) {
-            this.console.log('[AutoDodge] ⏳ Tropas ' + attackType + ' já enviadas para este grupo');
-            return;
-        }
-
-        const typeLabel = attackType === 'naval' ? '🚢 NAVAL' : '⚔️ TERRESTRE';
-        const totalUnits = Object.values(units).reduce((a, b) => a + b, 0);
-        
-        if (totalUnits === 0) {
-            this.console.log('[AutoDodge] ⚠️ Nenhuma unidade ' + typeLabel + ' disponível em ' + fromTownId);
-            return;
-        }
-
-        this.console.log('[AutoDodge] 🪖 Enviando ' + totalUnits + ' ' + typeLabel + ' tropas de ' + fromTownId + ' para ' + targetTownId);
-        this.console.log('[AutoDodge] ⏱️ Voltar ' + this.CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS o último ataque');
-
-        // Enviar tropas
-        this._sendUnits(fromTownId, targetTownId, units)
-            .then(async (result) => {
-                this.console.log('[AutoDodge] Resposta do servidor (' + typeLabel + '):', result);
-                
-                await this.sleep(2500);
-                const commandId = this._findSupportCommandId(fromTownId, targetTownId);
-                
-                if (commandId) {
-                    this.console.log('[AutoDodge] 📋 Command ID ' + typeLabel + ': #' + commandId);
-                    this._troopsSent.add(timerKey);
-                    this._attackCommands.set(timerKey, commandId);
-                    
-                    // Agendar retorno
-                    const now = Math.floor(Date.now() / 1000);
-                    const recallDelay = (lastTime - now + this.CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000;
-                    const finalDelay = Math.max(recallDelay, 1000);
-                    
-                    if (this._dodgeState.returnTimers.has(timerKey)) {
-                        clearTimeout(this._dodgeState.returnTimers.get(timerKey));
-                    }
-                    
-                    const timer = setTimeout(() => {
-                        this._cancelCommand(commandId, fromTownId, groupKey, attackType);
-                        this._troopsSent.delete(timerKey);
-                    }, finalDelay);
-                    this._dodgeState.returnTimers.set(timerKey, timer);
-                    
-                    this.console.log('[AutoDodge] ⏱️ ' + typeLabel + ' programado para voltar em ' + Math.round(finalDelay/1000) + 's');
-                } else {
-                    this.console.log('[AutoDodge] ⚠️ Não foi possível extrair command_id para ' + typeLabel);
-                }
-            })
-            .catch((e) => {
-                this.console.log('[AutoDodge] ❌ Erro ao enviar ' + typeLabel + ': ' + e);
-            });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🚫 CANCELAR COMANDO (LÓGICA COMPLETA DO HERALD SO)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _cancelCommand(commandId, townId, groupKey, attackType) {
-        const typeLabel = attackType === 'naval' ? '🚢 NAVAL' : '⚔️ TERRESTRE';
-        this.console.log('[AutoDodge] 🚫 CANCELANDO ' + typeLabel + ' comando #' + commandId);
-
-        const data = {
-            model_url: 'Commands',
-            action_name: 'cancelCommand',
-            captcha: null,
-            arguments: { id: commandId },
-        };
-
-        this.ajaxPostWithTimeout('frontend_bridge', 'execute', data, 15000)
-            .then((res) => {
-                if (res && !res.error) {
-                    this.console.log('[AutoDodge] ✅ TROPAS ' + typeLabel + ' VOLTARAM!');
-                    this._playSound('success');
-                    
-                    const timerKey = groupKey + '_' + attackType;
-                    if (this._dodgeState.returnTimers.has(timerKey)) {
-                        clearTimeout(this._dodgeState.returnTimers.get(timerKey));
-                        this._dodgeState.returnTimers.delete(timerKey);
-                    }
-                    
-                    if (this._dodgeState.groupStatus.has(groupKey)) {
-                        this._dodgeState.groupStatus.get(groupKey).status = 'cancelled';
-                    }
-                    
-                    const log = document.getElementById('dodge_log');
-                    if (log) {
-                        log.textContent = '✅ Tropas ' + typeLabel + ' retornando!';
-                        log.style.color = '#00b894';
-                    }
-                    
-                    this._updateAttacksList();
-                } else {
-                    this.console.log('[AutoDodge] ❌ Erro ao cancelar ' + typeLabel + ': ' + JSON.stringify(res));
-                }
-            })
-            .catch((e) => {
-                this.console.log('[AutoDodge] ❌ Erro de rede ao cancelar ' + typeLabel + ': ' + e);
-            });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🪖 FUNÇÕES AUXILIARES DE UNIDADES
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _getUnitsFromTown(townId) {
-        const units = {};
+    _getGame() {
         try {
-            const town = uw.ITowns.towns[townId];
-            if (!town) return units;
-            
-            const allUnits = town.units();
-            for (const [unit, count] of Object.entries(allUnits)) {
-                if (unit === 'militia') continue;
-                if (count > 0) {
-                    units[unit] = count;
-                }
-            }
-        } catch(e) {
-            this.console.log('[AutoDodge] Erro ao obter unidades:', e);
-        }
-        return units;
+            if (typeof unsafeWindow !== 'undefined' && unsafeWindow.Game) return unsafeWindow.Game;
+            if (typeof window !== 'undefined' && window.Game) return window.Game;
+        } catch(e) {}
+        return null;
     }
 
-    _filterUnits(units, naval) {
-        const navalUnits = ['bireme', 'trireme', 'attack_ship', 'demolition_ship', 'colonize_ship', 'small_transporter', 'big_transporter'];
-        const result = {};
-        
-        for (const [unit, count] of Object.entries(units)) {
-            const isNaval = navalUnits.indexOf(unit) !== -1;
-            if (isNaval === naval && count > 0) {
-                result[unit] = Math.min(count, this.CONFIG.MAX_TROOPS_TO_SEND);
-            }
-        }
-        
-        return result;
-    }
-
-    _findSupportCommandId(fromTownId, toTownId) {
+    _getMM() {
         try {
-            const models = uw.MM.getModels().MovementsUnits;
-            if (!models) return null;
-
-            for (const key in models) {
-                const mv = models[key].attributes;
-                if (!mv) continue;
-                if (mv.type !== 'support') continue;
-                if (String(mv.home_town_id) !== String(fromTownId)) continue;
-                if (String(mv.target_town_id) !== String(toTownId)) continue;
-
-                const cmdId = mv.command_id;
-                if (!cmdId) continue;
-
-                return cmdId;
-            }
-            return null;
-        } catch (e) {
-            return null;
-        }
+            if (typeof unsafeWindow !== 'undefined' && unsafeWindow.MM) return unsafeWindow.MM;
+            if (typeof window !== 'undefined' && window.MM) return window.MM;
+        } catch(e) {}
+        return null;
     }
 
-    _sendUnits(fromTownId, toTownId, units) {
-        return this._withTownId(fromTownId, () => {
-            const data = Object.assign(
-                { id: parseInt(toTownId, 10), type: 'support' },
-                units
-            );
-            return this.ajaxPostWithTimeout('town_info', 'send_units', data, 15000);
-        });
-    }
-
-    async _withTownId(townId, fn) {
-        const orig = uw.Game.townId;
-        const origStr = uw.Game.town_id;
-        uw.Game.townId = parseInt(townId, 10);
-        uw.Game.town_id = parseInt(townId, 10);
-
+    _getITowns() {
         try {
-            const result = await fn();
-            return result;
-        } finally {
-            uw.Game.townId = orig;
-            uw.Game.town_id = origStr;
-        }
+            if (typeof unsafeWindow !== 'undefined' && unsafeWindow.ITowns) return unsafeWindow.ITowns;
+            if (typeof window !== 'undefined' && window.ITowns) return window.ITowns;
+        } catch(e) {}
+        return null;
     }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🔊 SONS
-    // ═══════════════════════════════════════════════════════════════════════
 
     _playSound(type = 'warning') {
         if (!this.CONFIG.SOUND_ALERTS) return;
@@ -991,123 +587,441 @@ var AutoDodge = class extends MultUtil {
             gain.gain.value = 0.1;
             osc.start();
             osc.stop(ctx.currentTime + 0.2);
-        } catch(e) { /* Silencioso */ }
+        } catch(e) {}
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🧹 CLEANUP
+    // 🧬 DETETAR TIPO DE ATAQUE
     // ═══════════════════════════════════════════════════════════════════════
 
-    _cleanupExpiredGroups() {
-        const now = Math.floor(Date.now() / 1000);
-        const toRemove = [];
+    _detectAttackType(attrs) {
+        const UNIDADES_NAVAIS = ['bireme', 'trireme', 'attack_ship', 'demolition_ship', 'colonize_ship', 'small_transporter', 'big_transporter'];
+        const UNIDADES_TERRESTRES = ['sword', 'archer', 'hoplite', 'slinger', 'rider', 'chariot', 'catapult', 'militia'];
         
-        for (const [key, data] of this._dodgeState.groupStatus) {
-            if (data.lastTime + 60 < now) {
-                toRemove.push(key);
+        if (attrs.type === 'attack_sea' || attrs.type === 'naval_attack') return 'naval';
+        if (attrs.type === 'attack_land' || attrs.type === 'ground_attack') return 'ground';
+        if (attrs.units) {
+            let hasNaval = false, hasGround = false;
+            for (let u in attrs.units) {
+                if (UNIDADES_NAVAIS.indexOf(u) !== -1) hasNaval = true;
+                else if (UNIDADES_TERRESTRES.indexOf(u) !== -1) hasGround = true;
             }
+            if (hasNaval && !hasGround) return 'naval';
+            if (hasGround && !hasNaval) return 'ground';
+            if (hasNaval && hasGround) return 'mixed';
         }
-        
-        for (const key of toRemove) {
-            this._dodgeState.groupStatus.delete(key);
-            if (this._dodgeState.groupTimers.has(key)) {
-                clearTimeout(this._dodgeState.groupTimers.get(key));
-                this._dodgeState.groupTimers.delete(key);
-            }
-        }
-        
-        if (toRemove.length > 0) {
-            this.console.log('[AutoDodge] Removidos ' + toRemove.length + ' grupos expirados');
-        }
+        return 'mixed';
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🏝️ ISLAND SCRAPER
+    // 🪖 OBTER UNIDADES DA CIDADE
     // ═══════════════════════════════════════════════════════════════════════
 
-    _setupIslandScraper() {
-        if (this._islandScraperObserver) return;
+    _getUnitsFromTown(townId, attackType) {
+        var units = {};
+        var total = 0;
+        var MM = this._getMM();
+        const UNIDADES_NAVAIS = ['bireme', 'trireme', 'attack_ship', 'demolition_ship', 'colonize_ship', 'small_transporter', 'big_transporter'];
+        const UNIDADES_TERRESTRES = ['sword', 'archer', 'hoplite', 'slinger', 'rider', 'chariot', 'catapult', 'militia'];
 
-        this._islandScraperObserver = new MutationObserver((mutations) => {
-            for (const m of mutations) {
-                for (const node of m.addedNodes) {
-                    if (!node || node.nodeType !== 1) continue;
+        try {
+            if (MM && MM.getModels && MM.getModels().Units) {
+                var models = MM.getModels().Units;
+                for (var key in models) {
+                    if (!models.hasOwnProperty(key)) continue;
+                    var attrs = models[key].attributes || models[key];
+                    if (String(attrs.home_town_id) !== String(townId)) continue;
+                    if (attrs.current_town_id && String(attrs.current_town_id) !== String(townId)) continue;
 
-                    let links = [];
-                    try {
-                        if (node.matches && node.matches('a.gp_town_link')) {
-                            links = [node];
-                        } else if (node.querySelectorAll) {
-                            links = Array.from(node.querySelectorAll('a.gp_town_link'));
+                    for (var u in attrs) {
+                        if (!attrs.hasOwnProperty(u)) continue;
+                        if (u === 'id' || u === 'home_town_id' || u === 'current_town_id' ||
+                            u === 'current_town_player_id' || u === 'island_x' || u === 'island_y' ||
+                            u === 'number_on_island' || u === 'militia' || u === 'heroes' ||
+                            u === 'home_town_link' || u === 'current_town_link' ||
+                            u === 'current_player_link' || u === 'home_town_name' ||
+                            u === 'current_town_name' || u === 'same_island' ||
+                            u === 'god_favor' || u === 'god_power') continue;
+                        if (typeof attrs[u] === 'number' && attrs[u] > 0) {
+                            var isNaval = UNIDADES_NAVAIS.indexOf(u) !== -1;
+                            var isGround = UNIDADES_TERRESTRES.indexOf(u) !== -1;
+                            if (attackType === 'naval' && isNaval) {
+                                units[u] = (units[u] || 0) + attrs[u];
+                                total += attrs[u];
+                            } else if (attackType === 'ground' && isGround) {
+                                units[u] = (units[u] || 0) + attrs[u];
+                                total += attrs[u];
+                            } else if (attackType === 'mixed' || !attackType) {
+                                units[u] = (units[u] || 0) + attrs[u];
+                                total += attrs[u];
+                            }
                         }
-                    } catch (e) { continue; }
+                    }
+                    break;
+                }
+            }
+        } catch(e) {}
 
-                    if (links.length > 0) {
-                        setTimeout(() => this._harvestTownLinks(links), 400);
+        return { units: units, total: total };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 📤 ENVIAR SUPORTE (SEM LOGS)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _sendSupportForGroup(fromTownId, targetTownId, firstTime, lastTime, groupKey, attackType) {
+        var timerKey = groupKey + '_' + attackType;
+
+        if (this.troopsSent[timerKey]) return;
+
+        var Game = this._getGame();
+        if (!Game || !Game.csrfToken) return;
+
+        var result = this._getUnitsFromTown(fromTownId, attackType);
+        if (result.total === 0) return;
+
+        var limitedUnits = {};
+        var limitedTotal = 0;
+        for (var u in result.units) {
+            if (result.units.hasOwnProperty(u) && result.units[u] > 0) {
+                var amount = Math.min(result.units[u], this.CONFIG.MAX_TROOPS_TO_SEND);
+                limitedUnits[u] = amount;
+                limitedTotal += amount;
+            }
+        }
+
+        var departTime = Math.ceil(this._gameNow()) + 1;
+        var payload = {
+            id: Number(targetTownId),
+            town_id: Number(fromTownId),
+            type: 'support',
+            departure_time: departTime,
+            nl_init: true
+        };
+
+        for (var u in limitedUnits) {
+            if (limitedUnits.hasOwnProperty(u) && limitedUnits[u] > 0) {
+                payload[u] = limitedUnits[u];
+            }
+        }
+
+        var url = '/game/town_info?action=send_units&h=' + Game.csrfToken;
+        var commandId = null;
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url, false);
+        xhr.withCredentials = true;
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+        try {
+            xhr.send('json=' + encodeURIComponent(JSON.stringify(payload)));
+
+            if (xhr.responseText.indexOf('sucesso') !== -1 || xhr.responseText.indexOf('success') !== -1) {
+                this._playSound('success');
+                this.troopsSent[timerKey] = true;
+
+                try {
+                    var response = JSON.parse(xhr.responseText);
+                    if (response && response.json && response.json.notifications) {
+                        for (var i = 0; i < response.json.notifications.length; i++) {
+                            var notif = response.json.notifications[i];
+                            if (notif && notif.param_str) {
+                                try {
+                                    var data = JSON.parse(notif.param_str);
+                                    if (data && data.MovementsUnits && data.MovementsUnits.command_id) {
+                                        commandId = data.MovementsUnits.command_id;
+                                        break;
+                                    }
+                                } catch(e) {}
+                            }
+                        }
+                    }
+                } catch(e) {}
+
+                if (commandId) {
+                    var cmdKey = groupKey + '_' + attackType;
+                    this.attackCommands[cmdKey] = commandId;
+
+                    var cancelDelay = (lastTime - this._gameNow() + this.CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000;
+                    cancelDelay = Math.max(cancelDelay, 1000);
+
+                    var timerKey2 = groupKey + '_' + attackType;
+                    if (this.dodgeState.returnTimers[timerKey2]) {
+                        clearTimeout(this.dodgeState.returnTimers[timerKey2]);
+                    }
+
+                    this.dodgeState.returnTimers[timerKey2] = setTimeout(() => {
+                        this._cancelCommand(commandId, fromTownId, attackType, groupKey);
+                        delete this.troopsSent[timerKey2];
+                    }, cancelDelay);
+
+                    return commandId;
+                }
+            }
+        } catch(e) {}
+
+        return null;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🚫 CANCELAR COMANDO (SEM LOGS)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _cancelCommand(commandId, townId, attackType, groupKey) {
+        var Game = this._getGame();
+        if (!Game || !Game.csrfToken) return;
+
+        var payload = {
+            model_url: 'Commands',
+            action_name: 'cancelCommand',
+            captcha: null,
+            arguments: { id: commandId },
+            town_id: Number(townId),
+            nl_init: true
+        };
+
+        var url = '/game/frontend_bridge?action=execute&h=' + Game.csrfToken;
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.withCredentials = true;
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+        xhr.onload = () => {
+            if (xhr.responseText.indexOf('success') !== -1 || xhr.responseText.indexOf('ok') !== -1) {
+                this._playSound('success');
+
+                var timerKey = groupKey + '_' + attackType;
+                if (this.dodgeState.returnTimers[timerKey]) {
+                    clearTimeout(this.dodgeState.returnTimers[timerKey]);
+                    delete this.dodgeState.returnTimers[timerKey];
+                }
+
+                if (this.dodgeState.groupStatus[groupKey]) {
+                    this.dodgeState.groupStatus[groupKey].status = 'cancelled';
+                }
+                this._updateAttacksList();
+            }
+        };
+
+        xhr.send('json=' + encodeURIComponent(JSON.stringify(payload)));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🔍 SCAN DE ATAQUES (SEM LOGS)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _scanAttacks() {
+        if (!this._active || !this.CONFIG.AUTO_DODGE) return;
+        
+        var now = Date.now();
+        if (this.dodgeState.isScanning || (now - this.dodgeState.lastScan < 200)) return;
+        this.dodgeState.isScanning = true;
+        this.dodgeState.lastScan = now;
+
+        try {
+            var MM = this._getMM();
+            if (!MM) { this.dodgeState.isScanning = false; return; }
+            var mu = MM.getModels && MM.getModels().MovementsUnits;
+            if (!mu) { this.dodgeState.isScanning = false; return; }
+
+            var nowTime = this._gameNow();
+            var ITowns = this._getITowns();
+            var myTowns = ITowns && ITowns.getTowns ? ITowns.getTowns() : {};
+
+            var cityAttacks = {};
+
+            for (var key in mu) {
+                if (!mu.hasOwnProperty(key)) continue;
+                var attrs = mu[key].attributes || mu[key];
+                if (!attrs || !attrs.target_town_id) continue;
+
+                var targetIsMine = !!myTowns[attrs.target_town_id];
+                var isAttack = (attrs.type === 'attack' || attrs.type === 'attack_sea' || attrs.type === 'attack_land');
+                var isReturn = attrs.is_returning === true || (attrs.home_town_id === attrs.target_town_id);
+
+                if (!targetIsMine || !isAttack || isReturn) continue;
+                if (!attrs.arrival_at || attrs.arrival_at < nowTime) continue;
+
+                var townId = attrs.target_town_id;
+                if (this.CIDADES[townId] === undefined) continue;
+
+                if (!cityAttacks[townId]) {
+                    cityAttacks[townId] = [];
+                }
+                cityAttacks[townId].push({
+                    cmdId: key,
+                    arrival: attrs.arrival_at,
+                    type: this._detectAttackType(attrs)
+                });
+            }
+
+            for (var townId in cityAttacks) {
+                if (!cityAttacks.hasOwnProperty(townId)) continue;
+
+                var attacks = cityAttacks[townId];
+                if (attacks.length === 0) continue;
+
+                attacks.sort(function(a, b) { return a.arrival - b.arrival; });
+
+                var destino = this.CIDADES[townId];
+                if (!destino) continue;
+
+                var groups = [];
+                var currentGroup = [attacks[0]];
+
+                for (var i = 1; i < attacks.length; i++) {
+                    var gap = attacks[i].arrival - attacks[i-1].arrival;
+                    if (gap <= this.CONFIG.JANELA_GRUPO) {
+                        currentGroup.push(attacks[i]);
+                    } else {
+                        groups.push(currentGroup);
+                        currentGroup = [attacks[i]];
                     }
                 }
-            }
-        });
+                groups.push(currentGroup);
 
-        this._islandScraperObserver.observe(document.body, { childList: true, subtree: true });
-        this.console.log('[AutoDodge] 🌐 Aprendizado de ilhas ativo');
-    }
+                for (var g = 0; g < groups.length; g++) {
+                    var group = groups[g];
+                    var firstTime = group[0].arrival;
+                    var lastTime = group[group.length - 1].arrival;
+                    var groupKey = townId + '_group_' + firstTime + '_' + g;
 
-    _teardownIslandScraper() {
-        if (this._islandScraperObserver) {
-            this._islandScraperObserver.disconnect();
-            this._islandScraperObserver = null;
-        }
-    }
+                    if (this.dodgeState.executedGroups[groupKey]) continue;
 
-    _harvestTownLinks(links) {
-        let added = 0;
-        for (const el of links) {
-            try {
-                const href = el.getAttribute('href') || '';
-                const match = href.match(/#([A-Za-z0-9+/=]{8,})/);
-                if (!match) continue;
+                    var isGroup = group.length > 1;
+                    var timeToFirst = firstTime - nowTime;
 
-                const decoded = JSON.parse(atob(match[1]));
-                if (decoded.tp !== 'town') continue;
-                if (!decoded.id || decoded.ix === undefined || decoded.iy === undefined) continue;
+                    if (timeToFirst > 60) continue;
 
-                const key = decoded.ix + ',' + decoded.iy;
-                if (!this._islandCache[key]) this._islandCache[key] = {};
+                    var existingGroupKey = null;
+                    for (var existingKey in this.dodgeState.groupStatus) {
+                        if (this.dodgeState.groupStatus.hasOwnProperty(existingKey)) {
+                            var data = this.dodgeState.groupStatus[existingKey];
+                            if (data && data.townId == townId && !data.dodged) {
+                                if (Math.abs(data.lastTime - lastTime) <= this.CONFIG.JANELA_GRUPO) {
+                                    existingGroupKey = existingKey;
+                                    break;
+                                }
+                            }
+                        }
+                    }
 
-                const idStr = String(decoded.id);
-                if (!this._islandCache[key][idStr]) {
-                    this._islandCache[key][idStr] = { id: decoded.id, name: decoded.name || ('#' + decoded.id) };
-                    added++;
+                    if (existingGroupKey) {
+                        var existingData = this.dodgeState.groupStatus[existingGroupKey];
+                        for (var a = 0; a < group.length; a++) {
+                            var exists = existingData.attacks.some(function(att) { return att.cmdId === group[a].cmdId; });
+                            if (!exists) {
+                                existingData.attacks.push(group[a]);
+                            }
+                        }
+                        existingData.attacks.sort(function(a, b) { return a.arrival - b.arrival; });
+                        existingData.firstTime = existingData.attacks[0].arrival;
+                        existingData.lastTime = existingData.attacks[existingData.attacks.length - 1].arrival;
+                        existingData.isGroup = existingData.attacks.length > 1;
+
+                        if (this.dodgeState.groupTimers[existingGroupKey]) {
+                            clearTimeout(this.dodgeState.groupTimers[existingGroupKey]);
+                        }
+
+                        var newDodgeDelay = Math.max(existingData.firstTime - nowTime - this.CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
+                        this.dodgeState.groupTimers[existingGroupKey] = setTimeout(() => {
+                            this._executeDodgeForGroup(existingData.townId, existingData.destino, existingData.firstTime, existingData.lastTime, existingData.attacks, existingGroupKey, existingData.isGroup);
+                        }, newDodgeDelay);
+
+                        continue;
+                    }
+
+                    this.dodgeState.groupStatus[groupKey] = {
+                        townId: townId,
+                        destino: destino,
+                        firstTime: firstTime,
+                        lastTime: lastTime,
+                        attacks: group,
+                        isGroup: isGroup,
+                        status: 'waiting',
+                        dodged: false
+                    };
+
+                    var dodgeDelay = Math.max(firstTime - nowTime - this.CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
+
+                    if (this.dodgeState.groupTimers[groupKey]) {
+                        clearTimeout(this.dodgeState.groupTimers[groupKey]);
+                    }
+
+                    this.dodgeState.groupTimers[groupKey] = setTimeout(() => {
+                        this._executeDodgeForGroup(townId, destino, firstTime, lastTime, group, groupKey, isGroup);
+                    }, dodgeDelay);
                 }
-            } catch (e) {}
-        }
+            }
 
-        if (added > 0) {
-            this.storage.save('dodge_island_cache', this._islandCache);
-            this.console.log('[AutoDodge] Aprendidas ' + added + ' cidade(s)');
-        }
+            this._updateAttacksList();
+
+        } catch(e) {}
+
+        this.dodgeState.isScanning = false;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🔄 RECONCILIAÇÃO DE RECALLS (PERSISTÊNCIA)
+    // ⚡ EXECUTAR DODGE PARA UM GRUPO (SEM LOGS)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    _executeDodgeForGroup(townId, destino, firstTime, lastTime, attacks, groupKey, isGroup) {
+        try {
+            if (this.dodgeState.executedGroups[groupKey]) return;
+
+            var troops = this._getUnitsFromTown(townId, 'mixed');
+            if (troops.total < this.CONFIG.MIN_TROOPS_TO_DODGE) {
+                if (this.dodgeState.groupStatus[groupKey]) {
+                    this.dodgeState.groupStatus[groupKey].status = 'failed';
+                }
+                this._updateAttacksList();
+                return;
+            }
+
+            this._playSound('danger');
+            this.dodgeState.executedGroups[groupKey] = true;
+
+            this._sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'ground');
+
+            setTimeout(() => {
+                this._sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'naval');
+            }, this.CONFIG.DIFERENCA_ENVIO * 1000);
+
+            if (this.dodgeState.groupStatus[groupKey]) {
+                this.dodgeState.groupStatus[groupKey].dodged = true;
+                this.dodgeState.groupStatus[groupKey].status = 'dodged';
+            }
+
+        } catch(e) {
+            if (this.dodgeState.groupStatus[groupKey]) {
+                this.dodgeState.groupStatus[groupKey].status = 'failed';
+            }
+        }
+        this._updateAttacksList();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🔄 RECONCILIAÇÃO DE RECALLS
     // ═══════════════════════════════════════════════════════════════════════
 
     _loadPendingRecallsStore() {
-        return this.storage.load('dodge_pending_recalls_herald', {});
+        return this.storage.load('dodge_pending_recalls_herald_original', {});
     }
 
     _savePendingRecall(recallKey, entry) {
         const store = this._loadPendingRecallsStore();
         store[recallKey] = entry;
-        this.storage.save('dodge_pending_recalls_herald', store);
+        this.storage.save('dodge_pending_recalls_herald_original', store);
     }
 
     _removePendingRecall(recallKey) {
         const store = this._loadPendingRecallsStore();
         if (store[recallKey]) {
             delete store[recallKey];
-            this.storage.save('dodge_pending_recalls_herald', store);
+            this.storage.save('dodge_pending_recalls_herald_original', store);
         }
     }
 
@@ -1116,8 +1030,6 @@ var AutoDodge = class extends MultUtil {
             const store = this._loadPendingRecallsStore();
             const keys = Object.keys(store);
             if (keys.length === 0) return;
-
-            this.console.log('[AutoDodge] Reconciliando ' + keys.length + ' recall(s) pendente(s)...');
 
             for (const recallKey of keys) {
                 const entry = store[recallKey];
@@ -1129,11 +1041,9 @@ var AutoDodge = class extends MultUtil {
                 const remaining = entry.dueAt - Date.now();
 
                 if (remaining <= 0) {
-                    this.console.log('[AutoDodge] Recall de ' + entry.townName + ' (' + entry.label + ') disparando agora.');
                     this._removePendingRecall(recallKey);
                     this._cancelCommand(entry.commandId, entry.townId, 'pending', entry.label);
                 } else {
-                    this.console.log('[AutoDodge] Recall de ' + entry.townName + ' (' + entry.label + ') reagendado para ' + Math.round(remaining / 1000) + 's.');
                     const timeoutId = setTimeout(() => {
                         this._pendingRecalls.delete(recallKey);
                         this._removePendingRecall(recallKey);
@@ -1142,9 +1052,7 @@ var AutoDodge = class extends MultUtil {
                     this._pendingRecalls.set(recallKey, { timeoutId: timeoutId, commandId: entry.commandId });
                 }
             }
-        } catch (e) {
-            this.console.log('[AutoDodge] Erro ao reconciliar recalls:', e);
-        }
+        } catch(e) {}
     }
 
     sleep(ms) {

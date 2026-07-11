@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════
-//  MODULE: AutoDodge - Versão Herald SO Original
-//  Mantém 100% da lógica do seu script original
-//  SEM LOGS no console do MultBot
+//  MODULE: AutoDodge - Configuração Manual no Script
+//  As cidades são configuradas diretamente no código
+//  Painel apenas para visualização de ataques
 // ══════════════════════════════════════════════════════
 var AutoDodge = class extends MultUtil {
     constructor(c, s) {
@@ -10,8 +10,9 @@ var AutoDodge = class extends MultUtil {
         this._intervalId = null;
         
         // ═══════════════════════════════════════════════════════════════════
-        // ⚙️ CONFIGURAÇÃO (IGUAL AO SEU SCRIPT ORIGINAL)
+        // ⚙️ CONFIGURAÇÃO MANUAL - EDITE AQUI SUAS CIDADES
         // ═══════════════════════════════════════════════════════════════════
+        // FORMATO: cidade_atacada: cidade_destino
         this.CIDADES = {
             2677: 2470,
             154: 156,
@@ -34,9 +35,10 @@ var AutoDodge = class extends MultUtil {
             DEBUG: false,
             AUTO_DODGE: true,
         };
+        // ═══════════════════════════════════════════════════════════════════
 
         // ═══════════════════════════════════════════════════════════════════
-        // ESTADO DO DODGE (MANTIDO IGUAL AO ORIGINAL)
+        // ESTADO DO DODGE
         // ═══════════════════════════════════════════════════════════════════
         this.dodgeState = {
             groupTimers: {},
@@ -51,9 +53,6 @@ var AutoDodge = class extends MultUtil {
         this.attackCommands = {};
         this._pendingRecalls = new Map();
         
-        // Carregar configurações salvas
-        this._loadConfig();
-        
         // Reconciliar recalls pendentes
         this._reconcilePendingRecalls();
 
@@ -63,50 +62,12 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📦 CONFIGURAÇÃO E PERSISTÊNCIA
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _loadConfig() {
-        try {
-            const saved = this.storage.load('dodge_cidades_herald_original', null);
-            if (saved && typeof saved === 'object') {
-                this.CIDADES = saved;
-            }
-            
-            const configSaved = this.storage.load('dodge_config_herald_original', null);
-            if (configSaved && typeof configSaved === 'object') {
-                Object.assign(this.CONFIG, configSaved);
-            }
-        } catch(e) {}
-    }
-
-    _saveConfig() {
-        try {
-            this.storage.save('dodge_cidades_herald_original', this.CIDADES);
-            this.storage.save('dodge_config_herald_original', this.CONFIG);
-        } catch(e) {}
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🎨 INTERFACE DO MÓDULO - NA ABA ATTACK
+    // 🎨 INTERFACE DO MÓDULO - APENAS VISUALIZAÇÃO
     // ═══════════════════════════════════════════════════════════════════════
 
     settings = () => {
         requestAnimationFrame(() => this._updateTitle());
         
-        // Gerar HTML das cidades configuradas
-        let cidadesHTML = '';
-        for (const [from, to] of Object.entries(this.CIDADES)) {
-            cidadesHTML += `
-                <div class="dodge-city-row" style="display:flex;gap:5px;margin:2px 0;align-items:center;">
-                    <input type="number" value="${from}" class="dodge_city_from" style="width:60px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 5px;font-size:11px;">
-                    <span style="color:#666;font-size:11px;">→</span>
-                    <input type="number" value="${to}" class="dodge_city_to" style="width:60px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 5px;font-size:11px;">
-                    <button onclick="window.dodge_removeCity(this)" style="background:#ff6b6b;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">✕</button>
-                </div>
-            `;
-        }
-
         return `
             <div class="game_border" style="margin-bottom:20px;">
                 <div class="game_border_top"></div>
@@ -118,7 +79,7 @@ var AutoDodge = class extends MultUtil {
                 <div class="game_border_corner corner3"></div>
                 <div class="game_border_corner corner4"></div>
                 
-                ${this.getTitleHtml('dodge_title', '🛡️ Herald SO - Dodge V49.2', this.toggle, '', this._active)}
+                ${this.getTitleHtml('dodge_title', '🛡️ Dodge Automático', this.toggle, '', this._active)}
                 
                 <!-- ATAQUES DETECTADOS -->
                 <div style="padding:5px 10px;font-weight:bold;font-size:12px;color:#a29bfe;border-bottom:1px solid #333;">
@@ -130,36 +91,32 @@ var AutoDodge = class extends MultUtil {
                     </div>
                 </div>
                 
-                <!-- CONFIGURAÇÃO DE CIDADES -->
+                <!-- CIDADES CONFIGURADAS -->
                 <div style="padding:5px 10px;font-weight:bold;font-size:12px;color:#a29bfe;border-top:1px solid #333;border-bottom:1px solid #333;">
-                    ⚙️ CIDADES PROTEGIDAS (cidade atacada → destino)
+                    🏙️ CIDADES CONFIGURADAS
+                </div>
+                <div style="padding:5px 10px;max-height:150px;overflow-y:auto;font-size:11px;color:#aaa;">
+                    ${Object.entries(this.CIDADES).map(([from, to]) => 
+                        `<div style="padding:2px 0;">🏙️ ${from} → ${to}</div>`
+                    ).join('')}
+                    <div style="color:#666;font-size:10px;margin-top:5px;border-top:1px solid #333;padding-top:5px;">
+                        📝 Edite as cidades no código do módulo
+                    </div>
                 </div>
                 
-                <div id="dodge_cidades_container" style="padding:5px 10px;max-height:150px;overflow-y:auto;">
-                    ${cidadesHTML}
-                </div>
-                
-                <div style="padding:5px 10px;display:flex;gap:5px;flex-wrap:wrap;">
-                    <button onclick="window.dodge_addCity()" style="background:#6c5ce7;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">➕ Adicionar</button>
-                    <button onclick="window.dodge_saveCities()" style="background:#00b894;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">💾 Salvar</button>
-                    <button onclick="window.dodge_autoDetect()" style="background:#fdcb6e;color:#000;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">🔍 Auto Detectar</button>
-                    <button onclick="window.dodge_clearAll()" style="background:#ff6b6b;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">🗑️ Limpar Tudo</button>
-                    <button onclick="window.dodge_test()" style="background:#a29bfe;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;">🧪 Testar</button>
-                </div>
-                
-                <!-- CONFIGURAÇÕES AVANÇADAS -->
+                <!-- CONFIGURAÇÕES -->
                 <div style="padding:5px 10px;border-top:1px solid #333;margin-top:5px;">
-                    <div style="font-size:10px;color:#888;">⚙️ Configurações Avançadas</div>
-                    <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;margin-top:3px;">
-                        <label style="color:#aaa;">Antecedência: <input type="number" value="${this.CONFIG.TEMPO_ANTECEDENCIA}" class="dodge_config_lead" style="width:40px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 5px;">s</label>
-                        <label style="color:#aaa;">Retorno: <input type="number" value="${this.CONFIG.MARGEM_SEGURANCA_RETORNO}" class="dodge_config_return" style="width:40px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 5px;">s</label>
-                        <label style="color:#aaa;">Janela Grupo: <input type="number" value="${this.CONFIG.JANELA_GRUPO}" class="dodge_config_window" style="width:40px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 5px;">s</label>
-                        <label style="color:#aaa;">Max Tropas: <input type="number" value="${this.CONFIG.MAX_TROOPS_TO_SEND}" class="dodge_config_max" style="width:40px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 5px;"></label>
+                    <div style="font-size:10px;color:#888;">⚙️ Configurações</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;margin-top:3px;color:#aaa;">
+                        <span>⏱️ Antecedência: ${this.CONFIG.TEMPO_ANTECEDENCIA}s</span>
+                        <span>⏱️ Retorno: ${this.CONFIG.MARGEM_SEGURANCA_RETORNO}s</span>
+                        <span>📦 Janela Grupo: ${this.CONFIG.JANELA_GRUPO}s</span>
+                        <span>📦 ${Object.keys(this.CIDADES).length} cidades protegidas</span>
                     </div>
                 </div>
                 
                 <div id="dodge_log" style="padding:2px 10px 8px;font-size:11px;color:#5a3a0a;min-height:16px;border-top:1px solid #333;margin-top:5px;">
-                    🛡️ Herald SO - ${Object.keys(this.CIDADES).length} cidades protegidas
+                    🛡️ ${Object.keys(this.CIDADES).length} cidades protegidas | ⭐ ${this.CONFIG.TEMPO_ANTECEDENCIA}s ANTES | ${this.CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS
                 </div>
             </div>
         `;
@@ -230,173 +187,6 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🎮 MÉTODOS DE CONTROLE EXPORTADOS
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _setupWindowMethods() {
-        const self = this;
-        
-        window.dodge_addCity = function() {
-            const container = document.getElementById('dodge_cidades_container');
-            if (!container) return;
-            
-            const div = document.createElement('div');
-            div.className = 'dodge-city-row';
-            div.style.cssText = 'display:flex;gap:5px;margin:2px 0;align-items:center;';
-            div.innerHTML = `
-                <input type="number" placeholder="Cidade" class="dodge_city_from" style="width:60px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 5px;font-size:11px;">
-                <span style="color:#666;font-size:11px;">→</span>
-                <input type="number" placeholder="Destino" class="dodge_city_to" style="width:60px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 5px;font-size:11px;">
-                <button onclick="window.dodge_removeCity(this)" style="background:#ff6b6b;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">✕</button>
-            `;
-            container.appendChild(div);
-        };
-        
-        window.dodge_removeCity = function(btn) {
-            const row = btn.closest('.dodge-city-row');
-            if (row) row.remove();
-        };
-        
-        window.dodge_saveCities = function() {
-            const fromInputs = document.querySelectorAll('.dodge_city_from');
-            const toInputs = document.querySelectorAll('.dodge_city_to');
-            const newCities = {};
-            
-            for (let i = 0; i < fromInputs.length; i++) {
-                const from = parseInt(fromInputs[i].value);
-                const to = parseInt(toInputs[i].value);
-                if (from && to) {
-                    newCities[from] = to;
-                }
-            }
-            
-            self.CIDADES = newCities;
-            self._saveConfig();
-            
-            const log = document.getElementById('dodge_log');
-            if (log) {
-                log.textContent = `✅ ${Object.keys(newCities).length} cidades salvas!`;
-                log.style.color = '#00b894';
-            }
-            
-            if (uw.HumanMessage) {
-                uw.HumanMessage.success('AutoDodge: ' + Object.keys(newCities).length + ' cidades salvas!');
-            }
-        };
-        
-        window.dodge_autoDetect = function() {
-            self._autoDetectCities();
-        };
-        
-        window.dodge_clearAll = function() {
-            if (!confirm('🗑️ Limpar todos os ataques e grupos?')) return;
-            
-            for (const key in self.dodgeState.groupTimers) {
-                clearTimeout(self.dodgeState.groupTimers[key]);
-            }
-            for (const key in self.dodgeState.returnTimers) {
-                clearTimeout(self.dodgeState.returnTimers[key]);
-            }
-            
-            self.dodgeState.groupStatus = {};
-            self.dodgeState.groupTimers = {};
-            self.dodgeState.returnTimers = {};
-            self.dodgeState.executedGroups = {};
-            self.troopsSent = {};
-            self.attackCommands = {};
-            
-            self._updateAttacksList();
-            
-            const log = document.getElementById('dodge_log');
-            if (log) {
-                log.textContent = '🗑️ Todos os ataques limpos!';
-                log.style.color = '#fcd34d';
-            }
-        };
-        
-        window.dodge_test = function() {
-            self._testDodge();
-        };
-        
-        const configObserver = new MutationObserver(() => {
-            const lead = document.querySelector('.dodge_config_lead');
-            const ret = document.querySelector('.dodge_config_return');
-            const win = document.querySelector('.dodge_config_window');
-            const max = document.querySelector('.dodge_config_max');
-            
-            if (lead && ret && win && max) {
-                self.CONFIG.TEMPO_ANTECEDENCIA = parseInt(lead.value) || 4;
-                self.CONFIG.MARGEM_SEGURANCA_RETORNO = parseInt(ret.value) || 2;
-                self.CONFIG.JANELA_GRUPO = parseInt(win.value) || 10;
-                self.CONFIG.MAX_TROOPS_TO_SEND = parseInt(max.value) || 1000;
-                self._saveConfig();
-            }
-        });
-        
-        configObserver.observe(document.body, { childList: true, subtree: true });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🔍 AUTO DETECTAR CIDADES
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _autoDetectCities() {
-        try {
-            const towns = uw.ITowns.towns;
-            if (!towns) return;
-            
-            let detected = 0;
-            const newCities = { ...this.CIDADES };
-            
-            for (const [id, town] of Object.entries(towns)) {
-                if (typeof town.getIslandCoordinateX !== 'function') continue;
-                
-                const ix = town.getIslandCoordinateX();
-                const iy = town.getIslandCoordinateY();
-                
-                for (const [id2, town2] of Object.entries(towns)) {
-                    if (id === id2) continue;
-                    if (typeof town2.getIslandCoordinateX !== 'function') continue;
-                    
-                    if (town2.getIslandCoordinateX() === ix && town2.getIslandCoordinateY() === iy) {
-                        if (!newCities[id]) {
-                            newCities[id] = parseInt(id2);
-                            detected++;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            this.CIDADES = newCities;
-            this._saveConfig();
-            
-            const log = document.getElementById('dodge_log');
-            if (log) {
-                log.textContent = `🔍 Detectadas ${detected} cidades na mesma ilha!`;
-                log.style.color = '#fdcb6e';
-            }
-            
-            if (uw.HumanMessage) {
-                uw.HumanMessage.success('AutoDodge: ' + detected + ' cidades detectadas!');
-            }
-            
-            this._reloadSettings();
-        } catch(e) {}
-    }
-
-    _reloadSettings() {
-        const container = document.querySelector('.game_border');
-        if (container && container.parentNode) {
-            const parent = container.parentNode;
-            const newSettings = this.settings();
-            const temp = document.createElement('div');
-            temp.innerHTML = newSettings;
-            parent.replaceChild(temp.firstElementChild, container);
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
     // 🔄 CONTROLE DO MÓDULO
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -414,7 +204,6 @@ var AutoDodge = class extends MultUtil {
         this.storage.save('dodge_active', true);
         this._updateTitle();
         
-        this._setupWindowMethods();
         this._scanAttacks();
         this._intervalId = this.createGuardedInterval(() => {
             this._scanAttacks();
@@ -473,72 +262,7 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🧪 TESTE
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _testDodge() {
-        const towns = Object.keys(this.CIDADES);
-        if (towns.length === 0) return;
-        
-        const townId = parseInt(towns[0]);
-        const destino = this.CIDADES[townId];
-        const now = this._gameNow();
-
-        const tempos = [10, 11, 24, 27, 40];
-        const attacks = [];
-        
-        for (let i = 0; i < tempos.length; i++) {
-            const arrival = now + tempos[i];
-            const key = 'sim_' + Date.now() + '_' + i;
-            attacks.push({
-                cmdId: key,
-                arrival: arrival,
-                type: 'mixed'
-            });
-        }
-
-        const groups = [];
-        let currentGroup = [attacks[0]];
-        for (let i = 1; i < attacks.length; i++) {
-            const gap = attacks[i].arrival - attacks[i-1].arrival;
-            if (gap <= this.CONFIG.JANELA_GRUPO) {
-                currentGroup.push(attacks[i]);
-            } else {
-                groups.push(currentGroup);
-                currentGroup = [attacks[i]];
-            }
-        }
-        groups.push(currentGroup);
-
-        for (let g = 0; g < groups.length; g++) {
-            const group = groups[g];
-            const firstTime = group[0].arrival;
-            const lastTime = group[group.length - 1].arrival;
-            const groupKey = townId + '_group_' + firstTime + '_' + g;
-            const isGroup = group.length > 1;
-
-            this.dodgeState.groupStatus[groupKey] = {
-                townId: townId,
-                destino: destino,
-                firstTime: firstTime,
-                lastTime: lastTime,
-                attacks: group,
-                isGroup: isGroup,
-                status: 'waiting',
-                dodged: false
-            };
-
-            const dodgeDelay = Math.max(firstTime - now - this.CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
-            setTimeout((data, key) => {
-                this._executeDodgeForGroup(data.townId, data.destino, data.firstTime, data.lastTime, data.attacks, key, data.isGroup);
-            }, dodgeDelay, this.dodgeState.groupStatus[groupKey], groupKey);
-        }
-
-        this._updateAttacksList();
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🔍 FUNÇÕES AUXILIARES (SEM LOGS)
+    // 🔍 FUNÇÕES AUXILIARES
     // ═══════════════════════════════════════════════════════════════════════
 
     _gameNow() {
@@ -666,7 +390,7 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📤 ENVIAR SUPORTE (SEM LOGS)
+    // 📤 ENVIAR SUPORTE
     // ═══════════════════════════════════════════════════════════════════════
 
     _sendSupportForGroup(fromTownId, targetTownId, firstTime, lastTime, groupKey, attackType) {
@@ -765,7 +489,7 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🚫 CANCELAR COMANDO (SEM LOGS)
+    // 🚫 CANCELAR COMANDO
     // ═══════════════════════════════════════════════════════════════════════
 
     _cancelCommand(commandId, townId, attackType, groupKey) {
@@ -810,7 +534,7 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🔍 SCAN DE ATAQUES (SEM LOGS)
+    // 🔍 SCAN DE ATAQUES
     // ═══════════════════════════════════════════════════════════════════════
 
     _scanAttacks() {
@@ -965,7 +689,7 @@ var AutoDodge = class extends MultUtil {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // ⚡ EXECUTAR DODGE PARA UM GRUPO (SEM LOGS)
+    // ⚡ EXECUTAR DODGE PARA UM GRUPO
     // ═══════════════════════════════════════════════════════════════════════
 
     _executeDodgeForGroup(townId, destino, firstTime, lastTime, attacks, groupKey, isGroup) {
@@ -1008,20 +732,20 @@ var AutoDodge = class extends MultUtil {
     // ═══════════════════════════════════════════════════════════════════════
 
     _loadPendingRecallsStore() {
-        return this.storage.load('dodge_pending_recalls_herald_original', {});
+        return this.storage.load('dodge_pending_recalls_autoattack', {});
     }
 
     _savePendingRecall(recallKey, entry) {
         const store = this._loadPendingRecallsStore();
         store[recallKey] = entry;
-        this.storage.save('dodge_pending_recalls_herald_original', store);
+        this.storage.save('dodge_pending_recalls_autoattack', store);
     }
 
     _removePendingRecall(recallKey) {
         const store = this._loadPendingRecallsStore();
         if (store[recallKey]) {
             delete store[recallKey];
-            this.storage.save('dodge_pending_recalls_herald_original', store);
+            this.storage.save('dodge_pending_recalls_autoattack', store);
         }
     }
 

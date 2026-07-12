@@ -1355,9 +1355,14 @@
     console.log('[HERALD] 📦 Ataques com menos de ' + CONFIG.JANELA_GRUPO + 's = GRUPO');
     console.log('[HERALD] 🔴 ATUALIZAÇÃO EM TEMPO REAL!');
 
-    // ═══════════════════════════════════════════════════════════════════════
+       // ═══════════════════════════════════════════════════════════════════════
     // 📦 EXPORTAR PARA O MULTBOT
     // ═══════════════════════════════════════════════════════════════════════
+
+    // Garantir que _showPanel está disponível globalmente
+    window._showPanel = _showPanel;
+    window._scanAttacks = _scanAttacks;
+    window._updatePanel = _updatePanel;
 
     // Exportar a classe para o escopo global
     if (typeof window !== 'undefined') {
@@ -1393,7 +1398,7 @@
                                 ${Object.keys(CIDADES).length} cidades protegidas<br>
                                 📦 Grupo: ${CONFIG.JANELA_GRUPO}s | ⭐ ${CONFIG.TEMPO_ANTECEDENCIA}s ANTES | ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS
                             </div>
-                            <button onclick="if(window._showPanel) window._showPanel(); else if(window.b && window.b.herald && window.b.herald.control) window.b.herald.control.click();" style="
+                            <button onclick="if(window._showPanel) { window._showPanel(); } else { var icon = document.querySelector('.hw-control-icon'); if(icon) icon.click(); }" style="
                                 padding:10px 30px;
                                 background:#6c5ce7;
                                 color:#fff;
@@ -1419,18 +1424,26 @@
 
             toggle() {
                 if (b.herald.active) {
-                    b.herald.active = false;
-                    // Não paramos completamente, apenas desativamos o scan
-                    if (typeof window._hwToggleDodge === 'function') {
-                        window._hwToggleDodge(false);
+                    // Fechar o painel se estiver aberto
+                    var panel = document.getElementById('herald-panel');
+                    if (panel) {
+                        panel.style.display = 'none';
                     }
+                    b.herald.active = false;
                 } else {
                     b.herald.start();
+                    // Abrir o painel
+                    setTimeout(function() {
+                        if (window._showPanel) {
+                            window._showPanel();
+                        }
+                    }, 500);
                 }
             }
         };
 
         console.log('[AutoDodge] ✅ Classe AutoDodge exportada para o MultBot');
+        console.log('[AutoDodge] ✅ _showPanel exportada para window');
     }
 
 })();

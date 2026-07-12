@@ -76,7 +76,7 @@ var MultBot = class {
             const FROM = 154;
             const TO = 2195;
             const AMOUNT = 500;
-            const INTERVALO = 30; // 20 minutos
+            const INTERVALO = 5; // 20 minutos
             // ═══════════════════════════════════════════════════════
 
             // Substitui o método settings

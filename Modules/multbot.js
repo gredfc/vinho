@@ -77,6 +77,8 @@ GM_addStyle(`
         list-style: none !important;
         padding: 0 !important;
         margin: 0 !important;
+        max-height: 250px !important;
+        overflow-y: auto !important;
     }
 
     .attacks_list li {
@@ -87,6 +89,7 @@ GM_addStyle(`
         background: rgba(20, 12, 5, 0.3) !important;
         border-radius: 4px !important;
         margin: 2px 0 !important;
+        min-height: 32px !important;
     }
 
     .attacks_list li.odd {
@@ -110,6 +113,7 @@ GM_addStyle(`
         background-repeat: no-repeat !important;
         vertical-align: middle !important;
         margin-right: 8px !important;
+        background-size: 500px 150px !important;
     }
 
     .attacks_list .arrow {
@@ -125,11 +129,15 @@ GM_addStyle(`
     .attacks_list .row1 {
         font-weight: bold !important;
         color: #d4a017 !important;
+        display: inline-block !important;
+        font-size: 11px !important;
     }
 
     .attacks_list .row2 {
-        font-size: 11px !important;
+        font-size: 10px !important;
         color: #a89070 !important;
+        display: block !important;
+        margin-top: 2px !important;
     }
 
     .attacks_list .row2.expired {
@@ -159,9 +167,9 @@ GM_addStyle(`
     .attacks_list .show_units {
         cursor: pointer !important;
         color: #8B6914 !important;
-        font-size: 11px !important;
+        font-size: 10px !important;
         display: inline-block !important;
-        margin-left: 8px !important;
+        margin-left: 4px !important;
         transition: color 0.2s ease !important;
     }
 
@@ -174,6 +182,7 @@ GM_addStyle(`
         padding: 5px 0 !important;
         border-top: 1px solid #2a1a0a !important;
         margin-top: 5px !important;
+        clear: both !important;
     }
 
     .origin_town_units .unit_icon25x25 {
@@ -189,6 +198,7 @@ GM_addStyle(`
         font-weight: bold !important;
         margin: 2px !important;
         text-shadow: 0 0 10px rgba(255, 215, 0, 0.2) !important;
+        background-size: 500px 150px !important;
     }
 
     .attack-status {
@@ -232,6 +242,24 @@ GM_addStyle(`
         0%, 100% { opacity: 1; transform: scale(1); }
         50% { opacity: 0.5; transform: scale(0.8); }
     }
+
+    /* Scrollbar personalizada */
+    .attacks_list::-webkit-scrollbar {
+        width: 4px !important;
+    }
+
+    .attacks_list::-webkit-scrollbar-track {
+        background: #1a1008 !important;
+    }
+
+    .attacks_list::-webkit-scrollbar-thumb {
+        background: #8B6914 !important;
+        border-radius: 2px !important;
+    }
+
+    .attacks_list::-webkit-scrollbar-thumb:hover {
+        background: #d4a017 !important;
+    }
 `);
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -248,12 +276,12 @@ var AutoAttackModule = class {
         this.isRunning = false;
         this._active = false;
         this._intervalId = null;
+        this._updateInterval = null;
 
         // Carrega estado salvo
         const saved = this.storage.load('autoattack_active', false);
         if (saved) {
             this._active = true;
-            this.start();
         }
 
         this.console.log('[AutoAttack] ⚔️ Módulo inicializado!');
@@ -269,15 +297,22 @@ var AutoAttackModule = class {
 
     loadAttackQueue(callback) {
         const self = this;
-        DataExchanger.attack_planner(Game.townId, function(data) {
-            self.setAttackData(data);
+        try {
+            DataExchanger.attack_planner(Game.townId, function(data) {
+                self.setAttackData(data);
+                if (callback) callback();
+            });
+        } catch(e) {
+            this.console.log('[AutoAttack] ❌ Erro ao carregar ataques: ' + e.message);
             if (callback) callback();
-        });
+        }
     }
 
     setAttackData(data) {
         if (this.checkPremium()) {
             this.attacks = data.data && data.data.attacks !== undefined ? data.data.attacks : [];
+        } else {
+            this.attacks = [];
         }
     }
 
@@ -289,6 +324,7 @@ var AutoAttackModule = class {
 
         if (!this.checkPremium()) {
             this.console.log('[AutoAttack] ❌ Premium Captain necessário!');
+            HumanMessage.error('Premium Captain necessário!');
             return;
         }
 
@@ -302,12 +338,17 @@ var AutoAttackModule = class {
         this.loadAttackQueue(function() {
             if (!self.attacks || self.attacks.length === 0) {
                 self.console.log('[AutoAttack] ❌ Nenhum ataque disponível!');
+                HumanMessage.error('Nenhum ataque disponível!');
                 self.isRunning = false;
                 self._active = false;
                 self.storage.save('autoattack_active', false);
                 self.updateStatus('error', 'Nenhum ataque', 0);
+                self.renderAttackList();
                 return;
             }
+
+            HumanMessage.success('Enviando ' + self.attacks.length + ' ataques...');
+            self.renderAttackList();
 
             var deferreds = [];
             $.each(self.attacks, function(index, attack) {
@@ -343,6 +384,8 @@ var AutoAttackModule = class {
         this.attacks_timers = [];
         this.console.log('[AutoAttack] ⏹️ Parado!');
         this.updateStatus('idle', 'Pronto', this.attacks.length);
+        this.renderAttackList();
+        HumanMessage.info('AutoAttack parado!');
     }
 
     checkAttack(attack, index) {
@@ -408,7 +451,9 @@ var AutoAttackModule = class {
 
             var timeLeft = currentAttack.send_at - Timestamp.now();
             var msgEl = $('#attack_order_id_' + timer.attack_id + ' .attack_bot_timer');
-            msgEl.html(self.toHHMMSS(timeLeft));
+            if (msgEl.length) {
+                msgEl.html(self.toHHMMSS(timeLeft));
+            }
 
             if (timeLeft === 300 || timeLeft === 120 || timeLeft === 60) {
                 self.console.log('[AutoAttack] ⚔️ [' + currentAttack.origin_town_name + ' → ' + currentAttack.target_town_name + '] Partida em ' + self.toHHMMSS(timeLeft));
@@ -432,6 +477,8 @@ var AutoAttackModule = class {
             this.storage.save('autoattack_active', false);
             this.console.log('[AutoAttack] ✅ Todos os ataques finalizados!');
             this.updateStatus('done', 'Finalizado', this.attacks.length);
+            this.renderAttackList();
+            HumanMessage.success('Todos os ataques enviados!');
         }
     }
 
@@ -450,11 +497,17 @@ var AutoAttackModule = class {
                 var timer = self.attacks_timers.find(function(t) { return t.attack_id === attack.id; });
                 if (data.success && timer) {
                     timer.message_text = '✅ Sucesso!';
-                    $('#attack_order_id_' + attack.id + ' .attack_bot_timer').addClass('success').html('✅ Sucesso!');
+                    var msgEl = $('#attack_order_id_' + attack.id + ' .attack_bot_timer');
+                    if (msgEl.length) {
+                        msgEl.addClass('success').html('✅');
+                    }
                     self.console.log('[AutoAttack] ✅ [' + attack.origin_town_name + ' → ' + attack.target_town_name + '] ' + data.success);
                 } else if (data.error && timer) {
                     timer.message_text = '❌ Falha!';
-                    $('#attack_order_id_' + attack.id + ' .attack_bot_timer').addClass('error').html('❌ Falha!');
+                    var msgEl = $('#attack_order_id_' + attack.id + ' .attack_bot_timer');
+                    if (msgEl.length) {
+                        msgEl.addClass('error').html('❌');
+                    }
                     self.console.log('[AutoAttack] ❌ [' + attack.origin_town_name + ' → ' + attack.target_town_name + '] ' + data.error);
                 }
             }
@@ -486,19 +539,105 @@ var AutoAttackModule = class {
     }
 
     updateStatus(state, text, count) {
-        var dot = $('#attack-status-dot');
-        var statusText = $('#attack-status-text');
-        var countEl = $('#attack-count');
+        var dot = document.getElementById('attack-status-dot');
+        var statusText = document.getElementById('attack-status-text');
+        var countEl = document.getElementById('attack-count');
 
-        if (dot.length) {
-            dot.removeClass('idle running done error').addClass(state);
+        if (dot) {
+            dot.className = 'status-dot ' + state;
         }
-        if (statusText.length) {
-            statusText.text(text);
+        if (statusText) {
+            statusText.textContent = text;
         }
-        if (countEl.length && count !== undefined) {
-            countEl.text(count + ' ataques');
+        if (countEl && count !== undefined) {
+            countEl.textContent = count + ' ataques';
         }
+    }
+
+    renderAttackList() {
+        var container = document.getElementById('attack-list-container');
+        if (!container) return;
+
+        var list = document.createElement('ul');
+        list.className = 'attacks_list';
+
+        if (!this.attacks || this.attacks.length === 0) {
+            container.innerHTML = '<p style="color:#a89070;font-size:12px;padding:10px 0;">📭 Nenhum ataque planejado</p>';
+            this.updateStatus('idle', 'Nenhum ataque', 0);
+            return;
+        }
+
+        var self = this;
+        $.each(this.attacks, function(index, attack) {
+            index++;
+            var row = self.createAttackRow(attack, index);
+            list.appendChild(row);
+        });
+
+        container.innerHTML = '';
+        container.appendChild(list);
+        this.updateStatus('idle', 'Pronto', this.attacks.length);
+    }
+
+    createAttackRow(attack, index) {
+        var self = this;
+        var row = document.createElement('li');
+        row.className = 'attacks_row ' + ((index % 2 === 0) ? 'odd' : 'even');
+        row.id = 'attack_order_id_' + attack.id;
+
+        var timerText = '';
+        var timer = this.attacks_timers.find(function(t) { return t.attack_id === attack.id; });
+        if (timer) {
+            timerText = timer.is_running ? this.toHHMMSS(attack.send_at - Timestamp.now()) : timer.message_text;
+        }
+
+        var unitsDiv = document.createElement('div');
+        unitsDiv.className = 'origin_town_units';
+
+        if (attack.units) {
+            $.each(attack.units, function(id, count) {
+                if (count > 0) {
+                    var unitDiv = document.createElement('div');
+                    unitDiv.className = 'unit_icon25x25 ' + id;
+                    unitDiv.textContent = count;
+                    unitsDiv.appendChild(unitDiv);
+                }
+            });
+        }
+
+        row.innerHTML = `
+            <div style="display:flex; align-items:center; flex-wrap:wrap;">
+                <div class="attack_type32x32 ${attack.type}"></div>
+                <div class="arrow"></div>
+                <div class="row1">
+                    ${attack.origin_town_link || '???'} (${attack.origin_player_link || '???'})
+                    →
+                    ${attack.target_town_link || '???'} (${attack.target_player_link || '???'})
+                    <span class="show_units">📦</span>
+                </div>
+                <div class="attack_bot_timer">${timerText}</div>
+            </div>
+            <div class="row2${attack.send_at <= Timestamp.now() ? ' expired' : ''}">
+                Partida: ${DateHelper.formatDateTimeNice(attack.send_at)} | Chegada: ${DateHelper.formatDateTimeNice(attack.arrival_at)}
+            </div>
+        `;
+
+        // Adiciona unidades
+        row.appendChild(unitsDiv);
+
+        // Evento para mostrar/ocultar unidades
+        var showUnits = row.querySelector('.show_units');
+        if (showUnits) {
+            showUnits.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var units = row.querySelector('.origin_town_units');
+                if (units) {
+                    units.style.display = units.style.display === 'none' || units.style.display === '' ? 'block' : 'none';
+                }
+            });
+        }
+
+        return row;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -506,15 +645,25 @@ var AutoAttackModule = class {
     // ═══════════════════════════════════════════════════════════════════
 
     settings() {
-        const self = this;
-        const isCaptain = this.checkPremium();
+        var self = this;
+        var isCaptain = this.checkPremium();
 
-        // Força o carregamento dos ataques
-        setTimeout(() => {
-            this.loadAttackQueue(function() {
+        // Carrega ataques após renderizar
+        setTimeout(function() {
+            self.loadAttackQueue(function() {
                 self.renderAttackList();
             });
-        }, 500);
+        }, 300);
+
+        // Atualiza a lista a cada 5 segundos
+        if (this._updateInterval) {
+            clearInterval(this._updateInterval);
+        }
+        this._updateInterval = setInterval(function() {
+            if (self.isRunning) {
+                self.renderAttackList();
+            }
+        }, 5000);
 
         return `
         <div class="game_border" style="margin-bottom:20px;">
@@ -548,139 +697,7 @@ var AutoAttackModule = class {
                 </div>
                 ${!isCaptain ? `<div style="padding:8px 0;color:#ff6b6b;font-size:12px;">⚠️ Premium Captain necessário para enviar ataques</div>` : ''}
             </div>
-        </div>
-        <script>
-            (function() {
-                const self = window.multBot.autoAttack;
-
-                // Botão Ativar
-                document.getElementById('attack-activate-btn')?.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    if (!self.checkPremium()) {
-                        HumanMessage.error('Premium Captain necessário!');
-                        return;
-                    }
-                    self.start();
-                });
-
-                // Botão Atualizar
-                document.getElementById('attack-refresh-btn')?.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    if (!self.checkPremium()) {
-                        HumanMessage.error('Premium Captain necessário!');
-                        return;
-                    }
-                    self.loadAttackQueue(function() {
-                        self.renderAttackList();
-                        HumanMessage.success('Ataques atualizados!');
-                    });
-                });
-
-                // Botão Planejador
-                document.getElementById('attack-planner-btn')?.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    if (!self.checkPremium()) {
-                        HumanMessage.error('Premium Captain necessário!');
-                        return;
-                    }
-                    try {
-                        AttackPlannerWindowFactory.openAttackPlannerWindow();
-                    } catch(e) {
-                        console.log('⚠️ Erro ao abrir planejador:', e.message);
-                    }
-                });
-
-                // Botão Parar
-                document.getElementById('attack-stop-btn')?.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    self.stop();
-                    HumanMessage.info('AutoAttack parado!');
-                });
-            })();
-        </script>`;
-    }
-
-    renderAttackList() {
-        const container = document.getElementById('attack-list-container');
-        if (!container) return;
-
-        const list = document.createElement('ul');
-        list.className = 'attacks_list';
-
-        if (!this.attacks || this.attacks.length === 0) {
-            container.innerHTML = '<p style="color:#a89070;font-size:12px;padding:10px 0;">📭 Nenhum ataque planejado</p>';
-            this.updateStatus('idle', 'Nenhum ataque', 0);
-            return;
-        }
-
-        const self = this;
-        $.each(this.attacks, function(index, attack) {
-            index++;
-            list.appendChild(self.createAttackRow(attack, index));
-        });
-
-        container.innerHTML = '';
-        container.appendChild(list);
-        this.updateStatus('idle', 'Pronto', this.attacks.length);
-    }
-
-    createAttackRow(attack, index) {
-        const self = this;
-        const row = document.createElement('li');
-        row.className = 'attacks_row ' + ((index % 2 === 0) ? 'odd' : 'even');
-        row.id = 'attack_order_id_' + attack.id;
-
-        if (attack.send_at > Timestamp.now()) {
-            row.addEventListener('mouseenter', function() { this.classList.toggle('brown'); });
-            row.addEventListener('mouseleave', function() { this.classList.toggle('brown'); });
-        }
-
-        let timerText = '';
-        const timer = this.attacks_timers.find(function(t) { return t.attack_id === attack.id; });
-        if (timer) {
-            timerText = timer.is_running ? this.toHHMMSS(attack.send_at - Timestamp.now()) : timer.message_text;
-        }
-
-        const unitsDiv = document.createElement('div');
-        unitsDiv.className = 'origin_town_units';
-
-        if (attack.units) {
-            $.each(attack.units, function(id, count) {
-                if (count > 0) {
-                    const unitDiv = document.createElement('div');
-                    unitDiv.className = 'unit_icon25x25 ' + id;
-                    unitDiv.textContent = count;
-                    unitsDiv.appendChild(unitDiv);
-                }
-            });
-        }
-
-        row.innerHTML = `
-            <div class="attack_type32x32 ${attack.type}"></div>
-            <div class="arrow"></div>
-            <div class="row1">
-                ${attack.origin_town_link} (${attack.origin_player_link})
-                <span class="small_arrow"></span>
-                ${attack.target_town_link} (${attack.target_player_link})
-            </div>
-            <div class="row2${attack.send_at <= Timestamp.now() ? ' expired' : ''}">
-                <span>Partida</span> ${DateHelper.formatDateTimeNice(attack.send_at)}
-                <span>Chegada</span> ${DateHelper.formatDateTimeNice(attack.arrival_at)}
-            </div>
-            <div class="show_units">📦 Unidades</div>
-            <div class="attack_bot_timer">${timerText}</div>
-        `;
-
-        const showUnits = row.querySelector('.show_units');
-        if (showUnits) {
-            showUnits.addEventListener('click', function() {
-                unitsDiv.style.display = unitsDiv.style.display === 'none' ? 'block' : 'none';
-            });
-        }
-
-        row.appendChild(unitsDiv);
-
-        return row;
+        </div>`;
     }
 };
 
@@ -956,7 +973,7 @@ var MultBot = class {
                     render: this.settingsSendFree,
                 },
                 {
-                    title: '📋 Plano',  // ⭐ NOVA ABA
+                    title: '📋 Plano',
                     id: 'plano',
                     render: this.settingsPlano,
                 },
@@ -975,6 +992,9 @@ var MultBot = class {
         }));
 
         this.setup();
+
+        // ⭐ Configura os eventos dos botões da aba Plano
+        this._setupPlanoEvents();
     }
 
     _safeInit = (name, factory) => {
@@ -989,6 +1009,68 @@ var MultBot = class {
             return null;
         }
     };
+
+    _setupPlanoEvents() {
+        var self = this;
+        
+        // Usa MutationObserver para detectar quando a aba Plano é aberta
+        var observer = new MutationObserver(function() {
+            var activateBtn = document.getElementById('attack-activate-btn');
+            var refreshBtn = document.getElementById('attack-refresh-btn');
+            var plannerBtn = document.getElementById('attack-planner-btn');
+            var stopBtn = document.getElementById('attack-stop-btn');
+
+            if (activateBtn && !activateBtn._listenerAdded) {
+                activateBtn._listenerAdded = true;
+                activateBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (self.autoAttackModule) {
+                        self.autoAttackModule.start();
+                    }
+                });
+            }
+
+            if (refreshBtn && !refreshBtn._listenerAdded) {
+                refreshBtn._listenerAdded = true;
+                refreshBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (self.autoAttackModule) {
+                        self.autoAttackModule.loadAttackQueue(function() {
+                            self.autoAttackModule.renderAttackList();
+                            HumanMessage.success('Ataques atualizados!');
+                        });
+                    }
+                });
+            }
+
+            if (plannerBtn && !plannerBtn._listenerAdded) {
+                plannerBtn._listenerAdded = true;
+                plannerBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    try {
+                        AttackPlannerWindowFactory.openAttackPlannerWindow();
+                    } catch(e) {
+                        console.log('⚠️ Erro ao abrir planejador:', e.message);
+                    }
+                });
+            }
+
+            if (stopBtn && !stopBtn._listenerAdded) {
+                stopBtn._listenerAdded = true;
+                stopBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (self.autoAttackModule) {
+                        self.autoAttackModule.stop();
+                    }
+                });
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
 
     settingsStatus = () => {
         return this.statusPanel ? this.statusPanel.settings() : this._missingModuleHtml('Status');
@@ -1030,7 +1112,6 @@ var MultBot = class {
         return html;
     };
 
-    // ⭐ NOVA ABA "PLANO" - AutoAttack integrado
     settingsPlano = () => {
         let html = '';
         html += this.autoAttackModule ? this.autoAttackModule.settings() : this._missingModuleHtml('AutoAttack');

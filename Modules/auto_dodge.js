@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════
-//  MODULE: AutoDodge - Dodge Ultimate V49.2
+//  MODULE: AutoDodge - Dodge Ultimate V49.3 (CORRIGIDO)
 //  Painel dentro da aba Ataque do MultBot
 // ══════════════════════════════════════════════════════
 
@@ -173,6 +173,7 @@
 
     var attackCommands = {};
     var troopsSent = {};
+    var processedAttacks = {}; // ⭐ NOVO: guarda ataques já processados
 
     function _sendSupportForGroup(fromTownId, targetTownId, firstTime, lastTime, groupKey, attackType) {
         var timerKey = groupKey + '_' + attackType;
@@ -355,7 +356,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🔍 SCAN DE ATAQUES
+    // 🔍 SCAN DE ATAQUES (CORRIGIDO)
     // ═══════════════════════════════════════════════════════════════════════
 
     var dodgeState = {
@@ -384,6 +385,7 @@
             var myTowns = ITowns && ITowns.getTowns ? ITowns.getTowns() : {};
 
             var cityAttacks = {};
+            var currentAttackIds = {};
 
             for (var key in mu) {
                 if (!mu.hasOwnProperty(key)) continue;
@@ -400,6 +402,14 @@
                 var townId = attrs.target_town_id;
                 if (CIDADES[townId] === undefined) continue;
 
+                var attackId = key;
+                currentAttackIds[attackId] = true;
+
+                // ⭐ Remove ataques que já não existem mais
+                if (processedAttacks[attackId] && !currentAttackIds[attackId]) {
+                    delete processedAttacks[attackId];
+                }
+
                 if (!cityAttacks[townId]) {
                     cityAttacks[townId] = [];
                 }
@@ -408,6 +418,14 @@
                     arrival: attrs.arrival_at,
                     type: _detectAttackType(attrs)
                 });
+            }
+
+            // ⭐ LIMPA grupos de ataques que já não existem
+            for (var key in dodgeState.executedGroups) {
+                var attackId = key.split('_')[0];
+                if (!currentAttackIds[attackId]) {
+                    delete dodgeState.executedGroups[key];
+                }
             }
 
             for (var townId in cityAttacks) {
@@ -442,8 +460,12 @@
                     var group = groups[g];
                     var firstTime = group[0].arrival;
                     var lastTime = group[group.length - 1].arrival;
-                    var groupKey = townId + '_group_' + firstTime + '_' + g;
+                    
+                    // ⭐ CRIA UMA CHAVE ÚNICA baseada nos cmdIds
+                    var cmdIds = group.map(function(a) { return a.cmdId; }).sort().join('_');
+                    var groupKey = townId + '_' + cmdIds;
 
+                    // ⭐ Se o grupo já foi executado, não faz nada
                     if (dodgeState.executedGroups[groupKey]) {
                         continue;
                     }
@@ -451,16 +473,27 @@
                     var isGroup = group.length > 1;
                     var timeToFirst = firstTime - nowTime;
 
+                    // ⭐ Se o ataque já passou, marca como executado
+                    if (timeToFirst < -10) {
+                        dodgeState.executedGroups[groupKey] = true;
+                        continue;
+                    }
+
                     if (timeToFirst > 60) {
                         continue;
                     }
 
+                    // ⭐ Verifica se já existe um grupo para este ataque
                     var existingGroupKey = null;
                     for (var existingKey in dodgeState.groupStatus) {
                         if (dodgeState.groupStatus.hasOwnProperty(existingKey)) {
                             var data = dodgeState.groupStatus[existingKey];
                             if (data && data.townId == townId && !data.dodged) {
-                                if (Math.abs(data.lastTime - lastTime) <= CONFIG.JANELA_GRUPO) {
+                                // Verifica se tem algum ataque em comum
+                                var hasCommon = data.attacks.some(function(att) {
+                                    return group.some(function(g) { return g.cmdId === att.cmdId; });
+                                });
+                                if (hasCommon) {
                                     existingGroupKey = existingKey;
                                     break;
                                 }
@@ -495,6 +528,7 @@
                         continue;
                     }
 
+                    // ⭐ NOVO GRUPO
                     dodgeState.groupStatus[groupKey] = {
                         townId: townId,
                         destino: destino,
@@ -535,6 +569,7 @@
 
     function _executeDodgeForGroup(townId, destino, firstTime, lastTime, attacks, groupKey, isGroup) {
         try {
+            // ⭐ Verifica se já foi executado
             if (dodgeState.executedGroups[groupKey]) {
                 return;
             }
@@ -553,6 +588,7 @@
             _log(`⚡ EXECUTANDO DODGE ${typeLabel} para ${townId} (${attacks.length} ataques)`, 'dodge');
             _playSound('danger');
 
+            // ⭐ Marca como executado ANTES de enviar
             dodgeState.executedGroups[groupKey] = true;
 
             _sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'ground');
@@ -578,7 +614,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📋 UPDATE PANEL - DENTRO DO MULBOT
+    // 📋 UPDATE PANEL
     // ═══════════════════════════════════════════════════════════════════════
 
     function _updatePanel() {
@@ -679,7 +715,6 @@
     // 🎯 CLASSE PARA O MULTOBOT
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Iniciar o sistema automaticamente
     var _systemActive = false;
     var _scanInterval = null;
 
@@ -712,10 +747,9 @@
     window.AutoDodge = class AutoDodge extends MultUtil {
         constructor(c, s) {
             super(c, s);
-            _log('🛡️ Dodge Ultimate V49.2 carregado!', 'info');
+            _log('🛡️ Dodge Ultimate V49.3 carregado!', 'info');
             _log('🏙️ ' + Object.keys(CIDADES).length + ' cidades protegidas', 'info');
             
-            // Iniciar automaticamente
             setTimeout(function() {
                 _startSystem();
             }, 1000);
@@ -736,7 +770,7 @@
                     <div class="game_border_corner corner4"></div>
                     
                     <div style="padding:8px 12px;background:#1a1a2e;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;">
-                        <span style="font-weight:bold;font-size:14px;color:#a29bfe;">🛡️ Dodge Ultimate V49.2 - <span style="color:${isActive ? '#00b894' : '#888'};">${isActive ? '🟢 ATIVO' : '🔴 INATIVO'}</span></span>
+                        <span style="font-weight:bold;font-size:14px;color:#a29bfe;">🛡️ Dodge Ultimate V49.3 - <span style="color:${isActive ? '#00b894' : '#888'};">${isActive ? '🟢 ATIVO' : '🔴 INATIVO'}</span></span>
                         <button onclick="window._toggleDodgeSystem()" style="padding:4px 16px;border-radius:6px;border:none;cursor:pointer;background:${isActive ? '#ff6b6b' : '#00b894'};color:#fff;font-weight:bold;font-size:12px;">
                             ${isActive ? 'PARAR' : 'INICIAR'}
                         </button>
@@ -766,7 +800,7 @@
                     </div>
                     
                     <div style="padding:4px 12px;font-size:9px;color:#555;background:#0f0f1a;border-top:1px solid #333;text-align:center;">
-                        Dodge Ultimate V49.2 - Agrupamento + Recall Automático
+                        Dodge Ultimate V49.3 - Agrupamento + Recall Automático
                     </div>
                 </div>
             `;
@@ -788,13 +822,12 @@
         } else {
             _startSystem();
         }
-        // Recarregar o módulo no MultBot
         if (window.MultBot && window.MultBot.loadModule) {
             window.MultBot.loadModule('AutoDodge');
         }
     };
 
-    console.log('[AutoDodge] 🛡️ Dodge Ultimate V49.2');
+    console.log('[AutoDodge] 🛡️ Dodge Ultimate V49.3 - CORRIGIDO');
     console.log('[AutoDodge] 📦 Ataques com menos de ' + CONFIG.JANELA_GRUPO + 's = GRUPO');
     console.log('[AutoDodge] 🏙️ ' + Object.keys(CIDADES).length + ' cidades protegidas');
 

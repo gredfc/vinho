@@ -19,7 +19,7 @@ if (typeof GM_addStyle === 'undefined') {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 📦 MULTBOT - COM CONFIGURAÇÃO NO PAINEL
+// 📦 MULTBOT - COM CONFIGURAÇÃO NO PAINEL (CORRIGIDO)
 // ═══════════════════════════════════════════════════════════════════════
 
 var MultBot = class {
@@ -135,33 +135,91 @@ var MultBot = class {
     };
 
     // ═══════════════════════════════════════════════════════════════════════
-    // ⭐ PERSONALIZAÇÃO DO AutoSendResources COM CONFIGURAÇÃO
+    // ⭐ PERSONALIZAÇÃO DO AutoSendResources COM CONFIGURAÇÃO (CORRIGIDO)
     // ═══════════════════════════════════════════════════════════════════════
     _personalizarAutoSendResources() {
         const module = this.autoSendResources;
 
         // ═══════════════════════════════════════════════════════
-        //  CONFIGURAÇÃO PADRÃO (carregada do storage se existir)
+        //  CONFIGURAÇÃO PADRÃO
         // ═══════════════════════════════════════════════════════
         const DEFAULT_CONFIG = {
-            from: parseInt(module.storage.load('asr_from')) || 154,
-            to: parseInt(module.storage.load('asr_to')) || 2195,
-            amount: parseInt(module.storage.load('asr_amount')) || 500,
-            intervalo: parseInt(module.storage.load('asr_intervalo')) || 1200, // 20 min
+            from: 154,
+            to: 2195,
+            amount: 500,
+            intervalo: 1200, // 20 min
         };
 
         // ═══════════════════════════════════════════════════════
-        //  SETTINGS COM CAMPOS DE CONFIGURAÇÃO
+        //  FUNÇÃO PARA CARREGAR CONFIGURAÇÃO DO STORAGE
         // ═══════════════════════════════════════════════════════
-        module.settings = function() {
-            const config = {
+        module._getConfig = function() {
+            return {
                 from: parseInt(this.storage.load('asr_from')) || DEFAULT_CONFIG.from,
                 to: parseInt(this.storage.load('asr_to')) || DEFAULT_CONFIG.to,
                 amount: parseInt(this.storage.load('asr_amount')) || DEFAULT_CONFIG.amount,
                 intervalo: parseInt(this.storage.load('asr_intervalo')) || DEFAULT_CONFIG.intervalo,
             };
+        };
 
+        // ═══════════════════════════════════════════════════════
+        //  FUNÇÃO PARA SALVAR CONFIGURAÇÃO
+        // ═══════════════════════════════════════════════════════
+        module._saveConfig = function(from, to, amount, intervalo) {
+            this.storage.save('asr_from', from);
+            this.storage.save('asr_to', to);
+            this.storage.save('asr_amount', amount);
+            this.storage.save('asr_intervalo', intervalo);
+            
+            console.log(`[AutoSend] ✅ Configuração salva: ${from} → ${to} | ${amount} cada | ${intervalo/60}min`);
+            
+            // Atualiza o título
+            const title = uw.$('#asr_title');
+            if (title.length) {
+                title.text(`📦 Envio ${from} → ${to} (${amount} cada - ${intervalo/60}min)`);
+            }
+            
+            // Atualiza as informações
+            const infoDiv = uw.$('#asr_info');
+            if (infoDiv.length) {
+                infoDiv.html(`📤 Envia ${amount} madeira + ${amount} pedra + ${amount} prata (${amount * 3} total) a cada ${intervalo/60} minutos<br>📍 ${from} → ${to} | ✅ Recursos ≥ ${amount} cada + Capacidade ≥ ${amount * 3}`);
+            }
+            
+            // Log
+            const logEl = uw.$('#asr_log');
+            if (logEl.length) {
+                logEl.text(`✅ Configuração salva: ${from} → ${to} | ${amount} cada | ${intervalo/60}min`);
+                logEl.css('color', '#00aa00');
+            }
+            
+            // Se estiver ativo, reinicia para usar nova configuração
+            if (this._active) {
+                this.stop();
+                setTimeout(() => this.start(), 500);
+            }
+        };
+
+        // ═══════════════════════════════════════════════════════
+        //  SETTINGS COM CAMPOS DE CONFIGURAÇÃO (CORRIGIDO)
+        // ═══════════════════════════════════════════════════════
+        module.settings = function() {
+            const config = this._getConfig();
+            
             requestAnimationFrame(() => this._updateTitle());
+            
+            // Usa timeout para garantir que os campos são preenchidos depois de renderizar
+            setTimeout(() => {
+                const fromEl = document.getElementById('asr_config_from');
+                const toEl = document.getElementById('asr_config_to');
+                const amountEl = document.getElementById('asr_config_amount');
+                const intervaloEl = document.getElementById('asr_config_intervalo');
+                
+                if (fromEl) fromEl.value = config.from;
+                if (toEl) toEl.value = config.to;
+                if (amountEl) amountEl.value = config.amount;
+                if (intervaloEl) intervaloEl.value = config.intervalo / 60;
+            }, 100);
+            
             return `
             <div class="game_border" style="margin-bottom:20px;">
                 <div class="game_border_top"></div><div class="game_border_bottom"></div>
@@ -197,10 +255,8 @@ var MultBot = class {
                     </div>
                 </div>
                 
-                <div style="padding:2px 10px 4px;font-size:11px;color:#5a3a0a;">
-                    📤 Envia ${config.amount} madeira + ${config.amount} pedra + ${config.amount} prata (${config.amount * 3} total) a cada ${config.intervalo/60} minutos
-                </div>
-                <div style="padding:2px 10px 4px;font-size:11px;color:#5a3a0a;">
+                <div id="asr_info" style="padding:2px 10px 4px;font-size:11px;color:#5a3a0a;">
+                    📤 Envia ${config.amount} madeira + ${config.amount} pedra + ${config.amount} prata (${config.amount * 3} total) a cada ${config.intervalo/60} minutos<br>
                     📍 ${config.from} → ${config.to} | ✅ Recursos ≥ ${config.amount} cada + Capacidade ≥ ${config.amount * 3}
                 </div>
                 <div id="asr_log" style="padding:2px 10px 8px;font-size:12px;color:#2c1810;min-height:18px;font-weight:bold;"></div>
@@ -208,35 +264,6 @@ var MultBot = class {
                     ⏱ Última verificação: <span id="asr_timestamp">Aguardando...</span>
                 </div>
             </div>`;
-        };
-
-        // ═══════════════════════════════════════════════════════
-        //  FUNÇÃO PARA CARREGAR CONFIGURAÇÃO
-        // ═══════════════════════════════════════════════════════
-        module._getConfig = function() {
-            return {
-                from: parseInt(this.storage.load('asr_from')) || DEFAULT_CONFIG.from,
-                to: parseInt(this.storage.load('asr_to')) || DEFAULT_CONFIG.to,
-                amount: parseInt(this.storage.load('asr_amount')) || DEFAULT_CONFIG.amount,
-                intervalo: parseInt(this.storage.load('asr_intervalo')) || DEFAULT_CONFIG.intervalo,
-            };
-        };
-
-        // ═══════════════════════════════════════════════════════
-        //  FUNÇÃO PARA SALVAR CONFIGURAÇÃO
-        // ═══════════════════════════════════════════════════════
-        module._saveConfig = function(from, to, amount, intervalo) {
-            this.storage.save('asr_from', from);
-            this.storage.save('asr_to', to);
-            this.storage.save('asr_amount', amount);
-            this.storage.save('asr_intervalo', intervalo);
-            this.console.log(`[AutoSend] ✅ Configuração salva: ${from} → ${to} | ${amount} cada | ${intervalo/60}min`);
-            
-            // Se estiver ativo, reinicia para usar nova configuração
-            if (this._active) {
-                this.stop();
-                setTimeout(() => this.start(), 500);
-            }
         };
 
         // ═══════════════════════════════════════════════════════
@@ -326,7 +353,6 @@ var MultBot = class {
         // ═══════════════════════════════════════════════════════
         //  start COM CONFIGURAÇÃO DINÂMICA
         // ═══════════════════════════════════════════════════════
-        const originalStart = module.start;
         module.start = function() {
             if (this._active) return;
             const config = this._getConfig();
@@ -335,6 +361,7 @@ var MultBot = class {
             this._updateTitle();
             this.console.log(`[AutoSend] ✅ Iniciado! ${config.from} → ${config.to} | ${config.amount} de cada | ${config.intervalo/60}min`);
             this._tick();
+            if (this._intervalId) clearInterval(this._intervalId);
             this._intervalId = setInterval(() => this._tick(), config.intervalo * 1000);
         };
 
@@ -345,42 +372,47 @@ var MultBot = class {
         module.afterRender = function() {
             if (originalAfterRender) originalAfterRender.call(this);
 
-            // Botão Salvar
+            // ═══ Botão Salvar ═══
             const saveBtn = document.getElementById('asr_config_save');
             if (saveBtn) {
-                saveBtn.addEventListener('click', () => {
-                    const from = parseInt(document.getElementById('asr_config_from').value) || 154;
-                    const to = parseInt(document.getElementById('asr_config_to').value) || 2195;
-                    const amount = parseInt(document.getElementById('asr_config_amount').value) || 500;
-                    const intervalo = parseInt(document.getElementById('asr_config_intervalo').value) * 60 || 1200;
+                // Remove listeners antigos para evitar duplicação
+                const newSaveBtn = saveBtn.cloneNode(true);
+                saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+                
+                newSaveBtn.addEventListener('click', () => {
+                    const fromEl = document.getElementById('asr_config_from');
+                    const toEl = document.getElementById('asr_config_to');
+                    const amountEl = document.getElementById('asr_config_amount');
+                    const intervaloEl = document.getElementById('asr_config_intervalo');
+                    
+                    const from = parseInt(fromEl?.value) || 154;
+                    const to = parseInt(toEl?.value) || 2195;
+                    const amount = parseInt(amountEl?.value) || 500;
+                    const intervalo = (parseInt(intervaloEl?.value) || 20) * 60;
 
                     if (from === to) {
                         alert('⚠️ A cidade de origem e destino não podem ser iguais!');
                         return;
                     }
 
+                    // Salva a configuração
                     this._saveConfig(from, to, amount, intervalo);
                     
-                    // Atualiza o título
-                    const title = uw.$('#asr_title');
-                    if (title.length) {
-                        const text = `📦 Envio ${from} → ${to} (${amount} cada - ${intervalo/60}min)`;
-                        title.text(text);
-                    }
-                    
-                    // Atualiza o log
-                    const logEl = uw.$('#asr_log');
-                    if (logEl.length) {
-                        logEl.text(`✅ Configuração salva: ${from} → ${to} | ${amount} cada | ${intervalo/60}min`);
-                        logEl.css('color', '#00aa00');
-                    }
-                });
+                    // Atualiza os campos para mostrar os valores salvos
+                    if (fromEl) fromEl.value = from;
+                    if (toEl) toEl.value = to;
+                    if (amountEl) amountEl.value = amount;
+                    if (intervaloEl) intervaloEl.value = intervalo / 60;
+                }.bind(this));
             }
 
-            // Botão Padrão
+            // ═══ Botão Padrão ═══
             const defaultBtn = document.getElementById('asr_config_default');
             if (defaultBtn) {
-                defaultBtn.addEventListener('click', () => {
+                const newDefaultBtn = defaultBtn.cloneNode(true);
+                defaultBtn.parentNode.replaceChild(newDefaultBtn, defaultBtn);
+                
+                newDefaultBtn.addEventListener('click', () => {
                     document.getElementById('asr_config_from').value = 154;
                     document.getElementById('asr_config_to').value = 2195;
                     document.getElementById('asr_config_amount').value = 500;
@@ -388,14 +420,14 @@ var MultBot = class {
                     
                     const logEl = uw.$('#asr_log');
                     if (logEl.length) {
-                        logEl.text('↺ Configuração padrão carregada. Clique em "Salvar" para aplicar.');
+                        logEl.text('↺ Configuração padrão carregada (154→2195, 500, 20min). Clique em "Salvar" para aplicar.');
                         logEl.css('color', '#888800');
                     }
                 });
             }
         };
 
-        console.log('[MultBot] ✅ AutoSendResources personalizado com configuração!');
+        console.log('[MultBot] ✅ AutoSendResources personalizado com configuração (CORRIGIDO)!');
     }
 
     settingsStatus = () => {

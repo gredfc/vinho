@@ -1,5 +1,12 @@
-
-
+// No início do multBot.js, antes de tudo
+if (typeof GM_addStyle === 'undefined') {
+    window.GM_addStyle = function(css) {
+        var style = document.createElement('style');
+        style.textContent = css;
+        document.head.appendChild(style);
+    };
+    console.log('[MultBot] ✅ GM_addStyle fallback instalado');
+}
 // ==UserScript==
 // @name         BOt melhor - Dodge Ultimate V49.2 FINAL FUNCIONAL
 // @namespace    https://github.com/moreira/grepolis-herald

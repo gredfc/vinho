@@ -1,3 +1,28 @@
+// ═══════════════════════════════════════════════════════════════════════
+// 🛡️ FALLBACK PARA GM_addStyle - ANTES DE TUDO
+// ═══════════════════════════════════════════════════════════════════════
+
+// Se GM_addStyle não estiver definido, criar uma implementação
+if (typeof GM_addStyle === 'undefined') {
+    window.GM_addStyle = function(css) {
+        try {
+            var style = document.createElement('style');
+            style.textContent = css;
+            document.head.appendChild(style);
+            console.log('[MultBot] ✅ CSS injetado via fallback (GM_addStyle)');
+            return true;
+        } catch(e) {
+            console.error('[MultBot] ❌ Erro ao adicionar CSS: ' + e.message);
+            return false;
+        }
+    };
+    console.log('[MultBot] ✅ GM_addStyle fallback instalado');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 📦 MULTBOT
+// ═══════════════════════════════════════════════════════════════════════
+
 var MultBot = class {
     constructor() {
         this.console = new BotConsole();

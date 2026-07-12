@@ -19,7 +19,673 @@ if (typeof GM_addStyle === 'undefined') {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 📦 MULTBOT - COM OVERRIDE DO AutoSendResources APÓS CARREGAR
+// 🎨 CSS DO AUTOATTACK - TEMA CASTANHO
+// ═══════════════════════════════════════════════════════════════════════
+
+GM_addStyle(`
+    /* ============================================
+       AUTOATTACK - TEMA CASTANHO
+       ============================================ */
+
+    .attack-btn {
+        display: inline-block !important;
+        padding: 6px 14px !important;
+        background: linear-gradient(135deg, #3a2510, #2a1a0a) !important;
+        border: 1px solid #8B6914 !important;
+        border-radius: 4px !important;
+        color: #c8a86e !important;
+        cursor: pointer !important;
+        font-size: 12px !important;
+        font-weight: bold !important;
+        transition: all 0.3s ease !important;
+        text-decoration: none !important;
+        margin: 2px !important;
+    }
+
+    .attack-btn:hover {
+        background: linear-gradient(135deg, #4a3520, #3a2510) !important;
+        border-color: #d4a017 !important;
+        color: #ffd700 !important;
+        box-shadow: 0 0 20px rgba(139, 105, 20, 0.2) !important;
+        transform: translateY(-1px) !important;
+    }
+
+    .attack-btn.running {
+        background: linear-gradient(135deg, #2d5a1e, #1a3a0a) !important;
+        border-color: #44ff88 !important;
+        color: #44ff88 !important;
+    }
+
+    .attack-btn.stopped {
+        background: linear-gradient(135deg, #5a1e1e, #3a0a0a) !important;
+        border-color: #ff4444 !important;
+        color: #ff4444 !important;
+    }
+
+    .attack-btn.disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+        filter: grayscale(50%) !important;
+    }
+
+    .attack-btn.disabled:hover {
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
+    .attacks_list {
+        list-style: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .attacks_list li {
+        padding: 6px 8px !important;
+        border-bottom: 1px solid #2a1a0a !important;
+        font-size: 12px !important;
+        position: relative !important;
+        background: rgba(20, 12, 5, 0.3) !important;
+        border-radius: 4px !important;
+        margin: 2px 0 !important;
+    }
+
+    .attacks_list li.odd {
+        background: rgba(30, 20, 10, 0.2) !important;
+    }
+
+    .attacks_list li.even {
+        background: rgba(50, 35, 20, 0.15) !important;
+    }
+
+    .attacks_list li:hover {
+        background: rgba(139, 105, 20, 0.15) !important;
+        border-color: #8B6914 !important;
+    }
+
+    .attacks_list .attack_type32x32 {
+        display: inline-block !important;
+        width: 32px !important;
+        height: 32px !important;
+        background-image: url(https://grepolis.com/images/attack_types_sprite.png) !important;
+        background-repeat: no-repeat !important;
+        vertical-align: middle !important;
+        margin-right: 8px !important;
+    }
+
+    .attacks_list .arrow {
+        display: inline-block !important;
+        width: 16px !important;
+        height: 16px !important;
+        background-image: url(https://grepolis.com/images/arrows.png) !important;
+        background-position: 0 -32px !important;
+        vertical-align: middle !important;
+        margin: 0 4px !important;
+    }
+
+    .attacks_list .row1 {
+        font-weight: bold !important;
+        color: #d4a017 !important;
+    }
+
+    .attacks_list .row2 {
+        font-size: 11px !important;
+        color: #a89070 !important;
+    }
+
+    .attacks_list .row2.expired {
+        color: #ff4444 !important;
+    }
+
+    .attacks_list .attack_bot_timer {
+        position: absolute !important;
+        right: 10px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        color: #44ff88 !important;
+        font-weight: bold !important;
+        font-size: 14px !important;
+        font-family: 'Consolas', monospace !important;
+        text-shadow: 0 0 10px rgba(68, 255, 136, 0.2) !important;
+    }
+
+    .attacks_list .attack_bot_timer.success {
+        color: #44ff88 !important;
+    }
+
+    .attacks_list .attack_bot_timer.error {
+        color: #ff4444 !important;
+    }
+
+    .attacks_list .show_units {
+        cursor: pointer !important;
+        color: #8B6914 !important;
+        font-size: 11px !important;
+        display: inline-block !important;
+        margin-left: 8px !important;
+        transition: color 0.2s ease !important;
+    }
+
+    .attacks_list .show_units:hover {
+        color: #d4a017 !important;
+    }
+
+    .origin_town_units {
+        display: none !important;
+        padding: 5px 0 !important;
+        border-top: 1px solid #2a1a0a !important;
+        margin-top: 5px !important;
+    }
+
+    .origin_town_units .unit_icon25x25 {
+        display: inline-block !important;
+        width: 25px !important;
+        height: 25px !important;
+        background-image: url(https://grepolis.com/images/units_sprite.png) !important;
+        background-repeat: no-repeat !important;
+        color: #ffd700 !important;
+        font-size: 11px !important;
+        text-align: center !important;
+        line-height: 25px !important;
+        font-weight: bold !important;
+        margin: 2px !important;
+        text-shadow: 0 0 10px rgba(255, 215, 0, 0.2) !important;
+    }
+
+    .attack-status {
+        padding: 8px 0 !important;
+        color: #a89070 !important;
+        font-size: 12px !important;
+        clear: both !important;
+        border-top: 1px solid #2a1a0a !important;
+        margin-top: 8px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+
+    .attack-status .status-dot {
+        display: inline-block !important;
+        width: 10px !important;
+        height: 10px !important;
+        border-radius: 50% !important;
+        margin-right: 8px !important;
+    }
+
+    .attack-status .status-dot.idle {
+        background: #666 !important;
+    }
+
+    .attack-status .status-dot.running {
+        background: #44ff88 !important;
+        animation: pulse-dot 1s ease-in-out infinite !important;
+    }
+
+    .attack-status .status-dot.done {
+        background: #ffd700 !important;
+    }
+
+    .attack-status .status-dot.error {
+        background: #ff4444 !important;
+    }
+
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
+    }
+`);
+
+// ═══════════════════════════════════════════════════════════════════════
+// 📦 MÓDULO: AutoAttack - Integrado no MultBot
+// ═══════════════════════════════════════════════════════════════════════
+
+var AutoAttackModule = class {
+    constructor(console, storage) {
+        this.console = console;
+        this.storage = storage;
+        this.attacks = [];
+        this.attacks_timers = [];
+        this.checked_count = 0;
+        this.isRunning = false;
+        this._active = false;
+        this._intervalId = null;
+
+        // Carrega estado salvo
+        const saved = this.storage.load('autoattack_active', false);
+        if (saved) {
+            this._active = true;
+            this.start();
+        }
+
+        this.console.log('[AutoAttack] ⚔️ Módulo inicializado!');
+    }
+
+    checkPremium() {
+        try {
+            return $('.advisor_frame.captain div').hasClass('captain_active');
+        } catch(e) {
+            return false;
+        }
+    }
+
+    loadAttackQueue(callback) {
+        const self = this;
+        DataExchanger.attack_planner(Game.townId, function(data) {
+            self.setAttackData(data);
+            if (callback) callback();
+        });
+    }
+
+    setAttackData(data) {
+        if (this.checkPremium()) {
+            this.attacks = data.data && data.data.attacks !== undefined ? data.data.attacks : [];
+        }
+    }
+
+    start() {
+        if (this.isRunning) {
+            this.console.log('[AutoAttack] ⚠️ Já está em execução!');
+            return;
+        }
+
+        if (!this.checkPremium()) {
+            this.console.log('[AutoAttack] ❌ Premium Captain necessário!');
+            return;
+        }
+
+        this.console.log('[AutoAttack] ⚔️ Iniciando...');
+        this.isRunning = true;
+        this._active = true;
+        this.storage.save('autoattack_active', true);
+        this.attacks_timers = [];
+
+        const self = this;
+        this.loadAttackQueue(function() {
+            if (!self.attacks || self.attacks.length === 0) {
+                self.console.log('[AutoAttack] ❌ Nenhum ataque disponível!');
+                self.isRunning = false;
+                self._active = false;
+                self.storage.save('autoattack_active', false);
+                self.updateStatus('error', 'Nenhum ataque', 0);
+                return;
+            }
+
+            var deferreds = [];
+            $.each(self.attacks, function(index, attack) {
+                var def = $.Deferred();
+                self.checkAttack(attack, index).then(function() {
+                    def.resolve();
+                });
+                deferreds.push(def);
+            });
+
+            $.when.apply($, deferreds).done(function() {
+                self.checked_count = 0;
+                var runningCount = self.countRunningAttacks();
+                if (runningCount === 0) {
+                    self.isRunning = false;
+                    self._active = false;
+                    self.storage.save('autoattack_active', false);
+                    self.updateStatus('error', 'Nenhum ataque', 0);
+                } else {
+                    self.updateStatus('running', 'Executando ' + runningCount + ' ataques', self.attacks.length);
+                }
+            });
+        });
+    }
+
+    stop() {
+        this.isRunning = false;
+        this._active = false;
+        this.storage.save('autoattack_active', false);
+        this.attacks_timers.forEach(function(t) {
+            clearInterval(t.interval);
+        });
+        this.attacks_timers = [];
+        this.console.log('[AutoAttack] ⏹️ Parado!');
+        this.updateStatus('idle', 'Pronto', this.attacks.length);
+    }
+
+    checkAttack(attack, index) {
+        var def = $.Deferred();
+        var self = this;
+
+        if (attack.send_at >= Timestamp.now()) {
+            self.checked_count++;
+            setTimeout(function() {
+                DataExchanger.town_info_attack(attack.town_id, attack, function(data) {
+                    if (data.json) {
+                        if (!data.json.same_island || GameDataUnits.hasNavalUnits(attack.units)) {
+                            var capacity = GameDataUnits.calculateCapacity(attack.town_id, attack.units);
+                            if (capacity.needed_capacity > capacity.total_capacity) {
+                                var msg = 'Capacidade insuficiente';
+                                $('#attack_order_id_' + attack.id + ' .attack_bot_timer').removeClass('success').html(msg);
+                                self.addAttack(index, msg);
+                                def.resolve();
+                                return false;
+                            }
+                        }
+                        self.addAttack(index);
+                        def.resolve();
+                    }
+                });
+            }, ((self.checked_count * 1000) / 2));
+        } else {
+            var msg = 'Expirado';
+            self.addAttack(index, msg);
+            $('#attack_order_id_' + attack.id + ' .attack_bot_timer').removeClass('success').html(msg);
+            def.resolve();
+        }
+
+        return def;
+    }
+
+    addAttack(index, message) {
+        var self = this;
+        var attack = this.attacks[index];
+
+        if (!attack) return;
+
+        var timer = {
+            is_running: false,
+            attack_id: attack.id,
+            interval: null,
+            message_text: message || ''
+        };
+
+        if (message) {
+            this.attacks_timers.push(timer);
+            return;
+        }
+
+        timer.is_running = true;
+        timer.interval = setInterval(function() {
+            var currentAttack = self.attacks[index];
+            if (!currentAttack) {
+                timer.is_running = false;
+                clearInterval(timer.interval);
+                return;
+            }
+
+            var timeLeft = currentAttack.send_at - Timestamp.now();
+            var msgEl = $('#attack_order_id_' + timer.attack_id + ' .attack_bot_timer');
+            msgEl.html(self.toHHMMSS(timeLeft));
+
+            if (timeLeft === 300 || timeLeft === 120 || timeLeft === 60) {
+                self.console.log('[AutoAttack] ⚔️ [' + currentAttack.origin_town_name + ' → ' + currentAttack.target_town_name + '] Partida em ' + self.toHHMMSS(timeLeft));
+            }
+
+            if (currentAttack.send_at <= Timestamp.now()) {
+                timer.is_running = false;
+                self.sendAttack(currentAttack);
+                self.stopTimer(timer);
+            }
+        }, 1000);
+
+        this.attacks_timers.push(timer);
+    }
+
+    stopTimer(timer) {
+        clearInterval(timer.interval);
+        if (this.countRunningAttacks() === 0) {
+            this.isRunning = false;
+            this._active = false;
+            this.storage.save('autoattack_active', false);
+            this.console.log('[AutoAttack] ✅ Todos os ataques finalizados!');
+            this.updateStatus('done', 'Finalizado', this.attacks.length);
+        }
+    }
+
+    countRunningAttacks() {
+        return this.attacks_timers.filter(function(t) { return t.is_running; }).length;
+    }
+
+    sendAttack(attack) {
+        var self = this;
+        DataExchanger.send_units(
+            attack.town_id,
+            attack.type,
+            attack.target_town_id,
+            this.unitsToSend(attack.units),
+            function(data) {
+                var timer = self.attacks_timers.find(function(t) { return t.attack_id === attack.id; });
+                if (data.success && timer) {
+                    timer.message_text = '✅ Sucesso!';
+                    $('#attack_order_id_' + attack.id + ' .attack_bot_timer').addClass('success').html('✅ Sucesso!');
+                    self.console.log('[AutoAttack] ✅ [' + attack.origin_town_name + ' → ' + attack.target_town_name + '] ' + data.success);
+                } else if (data.error && timer) {
+                    timer.message_text = '❌ Falha!';
+                    $('#attack_order_id_' + attack.id + ' .attack_bot_timer').addClass('error').html('❌ Falha!');
+                    self.console.log('[AutoAttack] ❌ [' + attack.origin_town_name + ' → ' + attack.target_town_name + '] ' + data.error);
+                }
+            }
+        );
+    }
+
+    unitsToSend(units) {
+        var result = {};
+        $.each(units, function(id, count) {
+            if (count > 0) {
+                result[id] = count;
+            }
+        });
+        return result;
+    }
+
+    toHHMMSS(seconds) {
+        if (seconds < 0) seconds = 0;
+        var hours = Math.floor(seconds / 3600);
+        var minutes = Math.floor((seconds % 3600) / 60);
+        var secs = Math.floor(seconds % 60);
+        var ret = '';
+        if (hours > 0) {
+            ret += hours + ':' + (minutes < 10 ? '0' : '');
+        }
+        ret += minutes + ':' + (secs < 10 ? '0' : '');
+        ret += secs;
+        return ret;
+    }
+
+    updateStatus(state, text, count) {
+        var dot = $('#attack-status-dot');
+        var statusText = $('#attack-status-text');
+        var countEl = $('#attack-count');
+
+        if (dot.length) {
+            dot.removeClass('idle running done error').addClass(state);
+        }
+        if (statusText.length) {
+            statusText.text(text);
+        }
+        if (countEl.length && count !== undefined) {
+            countEl.text(count + ' ataques');
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  SETTINGS DA ABA "PLANO"
+    // ═══════════════════════════════════════════════════════════════════
+
+    settings() {
+        const self = this;
+        const isCaptain = this.checkPremium();
+
+        // Força o carregamento dos ataques
+        setTimeout(() => {
+            this.loadAttackQueue(function() {
+                self.renderAttackList();
+            });
+        }, 500);
+
+        return `
+        <div class="game_border" style="margin-bottom:20px;">
+            <div class="game_border_top"></div>
+            <div class="game_border_bottom"></div>
+            <div class="game_border_left"></div>
+            <div class="game_border_right"></div>
+            <div class="game_border_corner corner1"></div>
+            <div class="game_border_corner corner2"></div>
+            <div class="game_border_corner corner3"></div>
+            <div class="game_border_corner corner4"></div>
+            <div class="game_header bold" style="color:#d4a017;font-size:14px;padding:8px 12px;background:linear-gradient(135deg,#3a2510,#2a1a0a);border-bottom:2px solid #8B6914;">
+                ⚔️ Plano de Ataques <span style="font-size:10px;color:#c8a86e;font-weight:normal;">(Premium Captain necessário)</span>
+            </div>
+            <div style="padding:10px 12px;">
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+                    <a href="#" class="attack-btn" id="attack-activate-btn">▶️ Ativar Ataques</a>
+                    <a href="#" class="attack-btn" id="attack-refresh-btn">🔄 Atualizar</a>
+                    <a href="#" class="attack-btn" id="attack-planner-btn">📋 Planejador</a>
+                    <a href="#" class="attack-btn" id="attack-stop-btn" style="color:#ff6b6b;">⏹️ Parar</a>
+                </div>
+                <div id="attack-list-container">
+                    <p style="color:#a89070;font-size:12px;padding:10px 0;">⏳ A carregar ataques...</p>
+                </div>
+                <div class="attack-status">
+                    <span>
+                        <span class="status-dot idle" id="attack-status-dot"></span>
+                        <span id="attack-status-text">Pronto</span>
+                    </span>
+                    <span id="attack-count">${this.attacks ? this.attacks.length : 0} ataques</span>
+                </div>
+                ${!isCaptain ? `<div style="padding:8px 0;color:#ff6b6b;font-size:12px;">⚠️ Premium Captain necessário para enviar ataques</div>` : ''}
+            </div>
+        </div>
+        <script>
+            (function() {
+                const self = window.multBot.autoAttack;
+
+                // Botão Ativar
+                document.getElementById('attack-activate-btn')?.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (!self.checkPremium()) {
+                        HumanMessage.error('Premium Captain necessário!');
+                        return;
+                    }
+                    self.start();
+                });
+
+                // Botão Atualizar
+                document.getElementById('attack-refresh-btn')?.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (!self.checkPremium()) {
+                        HumanMessage.error('Premium Captain necessário!');
+                        return;
+                    }
+                    self.loadAttackQueue(function() {
+                        self.renderAttackList();
+                        HumanMessage.success('Ataques atualizados!');
+                    });
+                });
+
+                // Botão Planejador
+                document.getElementById('attack-planner-btn')?.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (!self.checkPremium()) {
+                        HumanMessage.error('Premium Captain necessário!');
+                        return;
+                    }
+                    try {
+                        AttackPlannerWindowFactory.openAttackPlannerWindow();
+                    } catch(e) {
+                        console.log('⚠️ Erro ao abrir planejador:', e.message);
+                    }
+                });
+
+                // Botão Parar
+                document.getElementById('attack-stop-btn')?.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    self.stop();
+                    HumanMessage.info('AutoAttack parado!');
+                });
+            })();
+        </script>`;
+    }
+
+    renderAttackList() {
+        const container = document.getElementById('attack-list-container');
+        if (!container) return;
+
+        const list = document.createElement('ul');
+        list.className = 'attacks_list';
+
+        if (!this.attacks || this.attacks.length === 0) {
+            container.innerHTML = '<p style="color:#a89070;font-size:12px;padding:10px 0;">📭 Nenhum ataque planejado</p>';
+            this.updateStatus('idle', 'Nenhum ataque', 0);
+            return;
+        }
+
+        const self = this;
+        $.each(this.attacks, function(index, attack) {
+            index++;
+            list.appendChild(self.createAttackRow(attack, index));
+        });
+
+        container.innerHTML = '';
+        container.appendChild(list);
+        this.updateStatus('idle', 'Pronto', this.attacks.length);
+    }
+
+    createAttackRow(attack, index) {
+        const self = this;
+        const row = document.createElement('li');
+        row.className = 'attacks_row ' + ((index % 2 === 0) ? 'odd' : 'even');
+        row.id = 'attack_order_id_' + attack.id;
+
+        if (attack.send_at > Timestamp.now()) {
+            row.addEventListener('mouseenter', function() { this.classList.toggle('brown'); });
+            row.addEventListener('mouseleave', function() { this.classList.toggle('brown'); });
+        }
+
+        let timerText = '';
+        const timer = this.attacks_timers.find(function(t) { return t.attack_id === attack.id; });
+        if (timer) {
+            timerText = timer.is_running ? this.toHHMMSS(attack.send_at - Timestamp.now()) : timer.message_text;
+        }
+
+        const unitsDiv = document.createElement('div');
+        unitsDiv.className = 'origin_town_units';
+
+        if (attack.units) {
+            $.each(attack.units, function(id, count) {
+                if (count > 0) {
+                    const unitDiv = document.createElement('div');
+                    unitDiv.className = 'unit_icon25x25 ' + id;
+                    unitDiv.textContent = count;
+                    unitsDiv.appendChild(unitDiv);
+                }
+            });
+        }
+
+        row.innerHTML = `
+            <div class="attack_type32x32 ${attack.type}"></div>
+            <div class="arrow"></div>
+            <div class="row1">
+                ${attack.origin_town_link} (${attack.origin_player_link})
+                <span class="small_arrow"></span>
+                ${attack.target_town_link} (${attack.target_player_link})
+            </div>
+            <div class="row2${attack.send_at <= Timestamp.now() ? ' expired' : ''}">
+                <span>Partida</span> ${DateHelper.formatDateTimeNice(attack.send_at)}
+                <span>Chegada</span> ${DateHelper.formatDateTimeNice(attack.arrival_at)}
+            </div>
+            <div class="show_units">📦 Unidades</div>
+            <div class="attack_bot_timer">${timerText}</div>
+        `;
+
+        const showUnits = row.querySelector('.show_units');
+        if (showUnits) {
+            showUnits.addEventListener('click', function() {
+                unitsDiv.style.display = unitsDiv.style.display === 'none' ? 'block' : 'none';
+            });
+        }
+
+        row.appendChild(unitsDiv);
+
+        return row;
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// 📦 MULTBOT - COM NOVA ABA "PLANO"
 // ═══════════════════════════════════════════════════════════════════════
 
 var MultBot = class {
@@ -56,30 +722,18 @@ var MultBot = class {
         this.autoResearch       = this._safeInit('AutoResearch', () => new AutoResearch(this.console, this.storage));
         this.statusPanel        = this._safeInit('StatusPanel', () => new StatusPanel(this.console, this.storage));
 
-        // ⭐ O AutoSendResources é carregado do servidor
-        // Depois vamos substituir o settings dele
+        // ⭐ AUTOATTACK - Novo módulo
+        this.autoAttackModule   = this._safeInit('AutoAttackModule', () => new AutoAttackModule(this.console, this.storage));
+
+        // AutoSendResources
         this.autoSendResources  = this._safeInit('AutoSendResources', () => new AutoSendResources(this.console, this.storage));
 
-        // ⭐ SUBSTITUI O settings DO MÓDULO CARREGADO PELO TEU
         if (this.autoSendResources) {
-            // Guarda referência ao original
-            const originalSettings = this.autoSendResources.settings;
-            const originalToggle = this.autoSendResources.toggle;
-            const originalStart = this.autoSendResources.start;
-            const originalStop = this.autoSendResources.stop;
-            const originalTick = this.autoSendResources._tick;
-            const originalSend = this.autoSendResources._sendResources;
-
-            // ═══════════════════════════════════════════════════════
-            //  CONFIGURAÇÃO DO TEU SCRIPT
-            // ═══════════════════════════════════════════════════════
             const FROM = 154;
             const TO = 2195;
-            const AMOUNT = 0; 
-            const INTERVALO = 0; 
-            // ═══════════════════════════════════════════════════════
+            const AMOUNT = 0;
+            const INTERVALO = 0;
 
-            // Substitui o método settings
             this.autoSendResources.settings = function() {
                 requestAnimationFrame(() => this._updateTitle());
                 return `
@@ -102,7 +756,6 @@ var MultBot = class {
                 </div>`;
             };
 
-            // Substitui o _tick
             this.autoSendResources._tick = async function() {
                 const logEl = uw.$('#asr_log');
                 const timestampEl = uw.$('#asr_timestamp');
@@ -183,7 +836,6 @@ var MultBot = class {
                 }
             };
 
-            // Substitui o _sendResources
             this.autoSendResources._sendResources = function(fromId, toId, amount) {
                 return new Promise((resolve) => {
                     try {
@@ -250,7 +902,6 @@ var MultBot = class {
                 });
             };
 
-            // Substitui o start para usar as novas configurações
             this.autoSendResources.start = function() {
                 if (this._active) return;
                 this._active = true;
@@ -303,6 +954,11 @@ var MultBot = class {
                     title: '📤 Send Free',
                     id: 'send_free',
                     render: this.settingsSendFree,
+                },
+                {
+                    title: '📋 Plano',  // ⭐ NOVA ABA
+                    id: 'plano',
+                    render: this.settingsPlano,
                 },
                 {
                     title: multT('tab_mult'),
@@ -371,6 +1027,13 @@ var MultBot = class {
     settingsAttack = () => {
         let html = '';
         html += this.autoAttack ? this.autoAttack.settings() : this._missingModuleHtml('Auto Dodge');
+        return html;
+    };
+
+    // ⭐ NOVA ABA "PLANO" - AutoAttack integrado
+    settingsPlano = () => {
+        let html = '';
+        html += this.autoAttackModule ? this.autoAttackModule.settings() : this._missingModuleHtml('AutoAttack');
         return html;
     };
 

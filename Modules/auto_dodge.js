@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════
 //  MODULE: AutoDodge - Dodge Ultimate V49.2
-//  Substitui o módulo "Auto Attack" na aba Ataque
+//  Painel dentro da aba Ataque do MultBot
 // ══════════════════════════════════════════════════════
 
 (function() {
@@ -31,355 +31,6 @@
         DEBUG: true,
         AUTO_DODGE: true,
     };
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🎨 CSS
-    // ═══════════════════════════════════════════════════════════════════════
-
-    // Função para adicionar CSS com fallback
-    function _addStyles() {
-        var css = `
-            #herald-panel {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                width: 420px;
-                max-width: 95vw;
-                max-height: 85vh;
-                background: #1a1a2e;
-                border: 1px solid #333;
-                border-radius: 12px;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-                z-index: 999999;
-                font-family: 'Segoe UI', Arial, sans-serif;
-                color: #eee;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-            }
-            #herald-panel .hw-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px 16px;
-                background: #16213e;
-                border-bottom: 1px solid #333;
-                flex-shrink: 0;
-            }
-            #herald-panel .hw-title {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 14px;
-                font-weight: 700;
-                color: #a29bfe;
-            }
-            #herald-panel .hw-controls {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-            }
-            #herald-panel .hw-close {
-                color: #888;
-                font-size: 18px;
-                cursor: pointer;
-                padding: 0 8px;
-                background: none;
-                border: none;
-            }
-            #herald-panel .hw-close:hover { color: #ff6b6b; }
-            #herald-panel .hw-toolbar {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 5px;
-                padding: 8px 12px;
-                background: #0f0f1a;
-                border-bottom: 1px solid #333;
-                flex-shrink: 0;
-                align-items: center;
-            }
-            #herald-panel .hw-toolbar .hw-search {
-                flex: 1;
-                min-width: 80px;
-                background: #222;
-                color: #eee;
-                border: 1px solid #444;
-                border-radius: 6px;
-                padding: 4px 10px;
-                font-size: 11px;
-                outline: none;
-            }
-            #herald-panel .hw-toolbar .hw-search:focus {
-                border-color: #6c5ce7;
-            }
-            #herald-panel .hw-toolbar .hw-counter {
-                font-size: 11px;
-                color: #888;
-                padding: 4px 10px;
-                background: #222;
-                border-radius: 6px;
-                white-space: nowrap;
-            }
-            #herald-panel .hw-toolbar .hw-counter .hw-count {
-                color: #a29bfe;
-                font-weight: 700;
-            }
-            #herald-panel .hw-toolbar .hw-counter .hw-count.hw-count-danger {
-                color: #ff6b6b;
-            }
-            #herald-panel .hw-toolbar .hw-btn {
-                background: #222;
-                color: #aaa;
-                border: 1px solid #444;
-                border-radius: 6px;
-                padding: 4px 10px;
-                font-size: 10px;
-                cursor: pointer;
-            }
-            #herald-panel .hw-toolbar .hw-btn:hover {
-                border-color: #6c5ce7;
-                color: #fff;
-            }
-            #herald-panel .hw-toolbar .hw-btn.hw-btn-danger {
-                background: #ff6b6b;
-                color: #fff;
-                border: none;
-            }
-            #herald-panel .hw-toolbar .hw-btn.hw-btn-success {
-                background: #00b894;
-                color: #fff;
-                border: none;
-            }
-            #herald-panel .hw-attack-list {
-                flex: 1;
-                overflow-y: auto;
-                padding: 8px 12px;
-                min-height: 100px;
-                max-height: 400px;
-            }
-            #herald-panel .hw-attack-list::-webkit-scrollbar {
-                width: 4px;
-            }
-            #herald-panel .hw-attack-list::-webkit-scrollbar-thumb {
-                background: #6c5ce7;
-                border-radius: 4px;
-            }
-            #herald-panel .hw-empty-state {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100%;
-                min-height: 80px;
-                color: #666;
-                font-size: 12px;
-                text-align: center;
-            }
-            #herald-panel .hw-empty-state .hw-empty-icon {
-                font-size: 28px;
-                margin-bottom: 6px;
-                opacity: 0.5;
-            }
-            #herald-panel .hw-attack-item {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 6px 10px;
-                padding: 8px 12px;
-                margin: 3px 0;
-                background: rgba(255,255,255,0.03);
-                border: 1px solid rgba(255,255,255,0.06);
-                border-radius: 8px;
-                font-size: 12px;
-            }
-            #herald-panel .hw-attack-item.hw-dodged {
-                border-color: rgba(0, 184, 148, 0.3);
-                background: rgba(0, 184, 148, 0.05);
-            }
-            #herald-panel .hw-attack-item.hw-group {
-                border-color: rgba(253, 203, 110, 0.3);
-                background: rgba(253, 203, 110, 0.05);
-            }
-            #herald-panel .hw-attack-item.hw-failed {
-                border-color: rgba(255, 107, 107, 0.3);
-                background: rgba(255, 107, 107, 0.05);
-            }
-            #herald-panel .hw-attack-to {
-                font-weight: 600;
-                color: #ddd;
-            }
-            #herald-panel .hw-attack-type {
-                font-size: 8px;
-                padding: 2px 8px;
-                border-radius: 10px;
-                text-transform: uppercase;
-                font-weight: 700;
-            }
-            #herald-panel .hw-attack-type.hw-type-ground {
-                background: #00b894;
-                color: #fff;
-            }
-            #herald-panel .hw-attack-type.hw-type-naval {
-                background: #0984e3;
-                color: #fff;
-            }
-            #herald-panel .hw-attack-type.hw-type-mixed {
-                background: #fdcb6e;
-                color: #000;
-            }
-            #herald-panel .hw-attack-badge {
-                font-size: 8px;
-                padding: 2px 8px;
-                border-radius: 10px;
-                background: #6c5ce7;
-                color: #fff;
-                font-weight: 700;
-            }
-            #herald-panel .hw-attack-badge.hw-badge-group {
-                background: #fdcb6e;
-                color: #000;
-            }
-            #herald-panel .hw-attack-time {
-                font-size: 11px;
-                color: #888;
-            }
-            #herald-panel .hw-attack-time.hw-urgent {
-                color: #ff6b6b;
-                font-weight: 700;
-            }
-            #herald-panel .hw-attack-time.hw-warning {
-                color: #fdcb6e;
-                font-weight: 700;
-            }
-            #herald-panel .hw-attack-time.hw-safe {
-                color: #00b894;
-            }
-            #herald-panel .hw-attack-status {
-                font-size: 8px;
-                padding: 2px 10px;
-                border-radius: 10px;
-                text-transform: uppercase;
-                font-weight: 700;
-            }
-            #herald-panel .hw-attack-status.hw-status-waiting {
-                background: rgba(116, 185, 255, 0.15);
-                color: #74b9ff;
-            }
-            #herald-panel .hw-attack-status.hw-status-dodged {
-                background: rgba(0, 184, 148, 0.15);
-                color: #00b894;
-            }
-            #herald-panel .hw-attack-status.hw-status-cancelled {
-                background: rgba(253, 203, 110, 0.1);
-                color: #fdcb6e;
-            }
-            #herald-panel .hw-attack-status.hw-status-failed {
-                background: rgba(255, 107, 107, 0.15);
-                color: #ff6b6b;
-            }
-            #herald-panel .hw-footer {
-                padding: 6px 12px;
-                border-top: 1px solid #333;
-                font-size: 9px;
-                color: #555;
-                text-align: center;
-                background: #0f0f1a;
-                flex-shrink: 0;
-            }
-            .hw-control-icon {
-                display: inline-block;
-                cursor: pointer;
-                font-size: 16px;
-                padding: 4px 8px;
-                opacity: 0.6;
-                position: relative;
-            }
-            .hw-control-icon:hover {
-                opacity: 1;
-            }
-            .hw-control-icon.hw-has-attacks {
-                opacity: 1;
-            }
-            .hw-control-icon .hw-icon-badge {
-                position: absolute;
-                top: -4px;
-                right: -4px;
-                background: #ff6b6b;
-                color: #fff;
-                border-radius: 50%;
-                font-size: 9px;
-                padding: 1px 6px;
-                min-width: 16px;
-                text-align: center;
-                font-weight: 700;
-            }
-            .hw-toggle {
-                position: relative;
-                width: 30px;
-                height: 16px;
-                flex-shrink: 0;
-            }
-            .hw-toggle input {
-                opacity: 0;
-                width: 0;
-                height: 0;
-            }
-            .hw-toggle .hw-toggle-slider {
-                position: absolute;
-                cursor: pointer;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: #444;
-                transition: 0.3s;
-                border-radius: 16px;
-            }
-            .hw-toggle .hw-toggle-slider:before {
-                position: absolute;
-                content: "";
-                height: 12px;
-                width: 12px;
-                left: 2px;
-                bottom: 2px;
-                background: #888;
-                transition: 0.3s;
-                border-radius: 50%;
-            }
-            .hw-toggle input:checked + .hw-toggle-slider {
-                background: #6c5ce7;
-            }
-            .hw-toggle input:checked + .hw-toggle-slider:before {
-                transform: translateX(14px);
-                background: #fff;
-            }
-            @media (max-width: 600px) {
-                #herald-panel {
-                    width: 95vw;
-                    bottom: 10px;
-                    right: 10px;
-                    border-radius: 10px;
-                    max-height: 90vh;
-                }
-                #herald-panel .hw-attack-item {
-                    font-size: 11px;
-                    padding: 6px 10px;
-                }
-            }
-        `;
-
-        try {
-            if (typeof GM_addStyle !== 'undefined') {
-                GM_addStyle(css);
-            } else {
-                var style = document.createElement('style');
-                style.textContent = css;
-                document.head.appendChild(style);
-            }
-        } catch(e) {
-            console.log('[AutoDodge] ⚠️ Erro ao adicionar CSS: ' + e.message);
-        }
-    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // 🛠️ FUNÇÕES AUXILIARES
@@ -422,7 +73,7 @@
         if (!CONFIG.DEBUG && type === 'debug') return;
         const icons = { info: '📘', success: '✅', warning: '⚠️', error: '❌', debug: '🔍', attack: '⚔️', dodge: '🛡️', naval: '🚢', ground: '⚔️', group: '📦' };
         const icon = icons[type] || '📘';
-        console.log(`[HERALD] ${icon} [${new Date().toLocaleTimeString()}] ${message}`);
+        console.log(`[DODGE] ${icon} [${new Date().toLocaleTimeString()}] ${message}`);
     }
 
     function _playSound(type = 'warning') {
@@ -517,7 +168,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📤 ENVIAR SUPORTE - COM RECALCULO DE TEMPO
+    // 📤 ENVIAR SUPORTE
     // ═══════════════════════════════════════════════════════════════════════
 
     var attackCommands = {};
@@ -555,10 +206,7 @@
             }
         }
 
-        var returnTime = Math.max(lastTime - _gameNow() + CONFIG.MARGEM_SEGURANCA_RETORNO, 3);
-
         _log(`🪖 Enviando ${limitedTotal} ${typeLabel} tropas de ${fromTownId} para ${targetTownId}`, 'info');
-        _log(`⏱️ Voltar ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS o último ataque (${new Date((lastTime + CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000).toLocaleTimeString()})`, 'info');
 
         var departTime = Math.ceil(_gameNow()) + 1;
         var payload = {
@@ -707,7 +355,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🔍 SCAN DE ATAQUES - COM RECALCULO DE GRUPOS
+    // 🔍 SCAN DE ATAQUES
     // ═══════════════════════════════════════════════════════════════════════
 
     var dodgeState = {
@@ -735,7 +383,6 @@
             var ITowns = _getITowns();
             var myTowns = ITowns && ITowns.getTowns ? ITowns.getTowns() : {};
 
-            // 1. COLETAR TODOS OS ATAQUES POR CIDADE
             var cityAttacks = {};
 
             for (var key in mu) {
@@ -763,7 +410,6 @@
                 });
             }
 
-            // 2. AGRUPAR ATAQUES POR CIDADE
             for (var townId in cityAttacks) {
                 if (!cityAttacks.hasOwnProperty(townId)) continue;
 
@@ -778,7 +424,6 @@
                     continue;
                 }
 
-                // 3. CRIAR GRUPOS
                 var groups = [];
                 var currentGroup = [attacks[0]];
 
@@ -793,7 +438,6 @@
                 }
                 groups.push(currentGroup);
 
-                // 4. PROCESSAR CADA GRUPO
                 for (var g = 0; g < groups.length; g++) {
                     var group = groups[g];
                     var firstTime = group[0].arrival;
@@ -811,13 +455,11 @@
                         continue;
                     }
 
-                    // ⭐ VERIFICAR SE JÁ EXISTE UM GRUPO PARA ESTA CIDADE E ATUALIZAR
                     var existingGroupKey = null;
                     for (var existingKey in dodgeState.groupStatus) {
                         if (dodgeState.groupStatus.hasOwnProperty(existingKey)) {
                             var data = dodgeState.groupStatus[existingKey];
                             if (data && data.townId == townId && !data.dodged) {
-                                // Verificar se o novo ataque está dentro da janela do grupo existente
                                 if (Math.abs(data.lastTime - lastTime) <= CONFIG.JANELA_GRUPO) {
                                     existingGroupKey = existingKey;
                                     break;
@@ -827,26 +469,20 @@
                     }
 
                     if (existingGroupKey) {
-                        // ⭐ ATUALIZAR GRUPO EXISTENTE
                         var existingData = dodgeState.groupStatus[existingGroupKey];
-                        // Adicionar novos ataques ao grupo
                         for (var a = 0; a < group.length; a++) {
                             var exists = existingData.attacks.some(function(att) { return att.cmdId === group[a].cmdId; });
                             if (!exists) {
                                 existingData.attacks.push(group[a]);
                             }
                         }
-                        // Reordenar e recalcular
                         existingData.attacks.sort(function(a, b) { return a.arrival - b.arrival; });
                         existingData.firstTime = existingData.attacks[0].arrival;
                         existingData.lastTime = existingData.attacks[existingData.attacks.length - 1].arrival;
                         existingData.isGroup = existingData.attacks.length > 1;
 
                         _log(`📦 GRUPO ATUALIZADO para ${townId}: ${existingData.attacks.length} ataques`, 'group');
-                        _log(`   ├─ Primeiro: ${new Date(existingData.firstTime * 1000).toLocaleTimeString()}`, 'debug');
-                        _log(`   └─ Último: ${new Date(existingData.lastTime * 1000).toLocaleTimeString()}`, 'debug');
 
-                        // Reagendar dodge com novo tempo
                         if (dodgeState.groupTimers[existingGroupKey]) {
                             clearTimeout(dodgeState.groupTimers[existingGroupKey]);
                         }
@@ -859,7 +495,6 @@
                         continue;
                     }
 
-                    // 5. CRIAR NOVO GRUPO
                     dodgeState.groupStatus[groupKey] = {
                         townId: townId,
                         destino: destino,
@@ -871,14 +506,8 @@
                         dodged: false
                     };
 
-                    var typeLabel = isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
-                    _log(`${typeLabel} para ${townId} (${group.length} ataques)`, isGroup ? 'group' : 'attack');
-                    _log(`   ├─ Primeiro: ${new Date(firstTime * 1000).toLocaleTimeString()}`, 'debug');
-                    _log(`   ├─ Último: ${new Date(lastTime * 1000).toLocaleTimeString()}`, 'debug');
-                    _log(`   ├─ ⭐ Enviar ${CONFIG.TEMPO_ANTECEDENCIA}s ANTES`, 'dodge');
-                    _log(`   └─ Voltar ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS`, 'dodge');
+                    _log(`📦 NOVO GRUPO para ${townId}: ${group.length} ataques`, 'group');
 
-                    // 6. AGENDAR DODGE
                     var dodgeDelay = Math.max(firstTime - nowTime - CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
 
                     if (dodgeState.groupTimers[groupKey]) {
@@ -907,7 +536,6 @@
     function _executeDodgeForGroup(townId, destino, firstTime, lastTime, attacks, groupKey, isGroup) {
         try {
             if (dodgeState.executedGroups[groupKey]) {
-                _log(`ℹ️ Grupo ${groupKey} já executado`, 'info');
                 return;
             }
 
@@ -922,20 +550,13 @@
             }
 
             var typeLabel = isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
-            var numAttacks = attacks.length;
-            _log(`⚡ EXECUTANDO DODGE ${typeLabel} para ${townId} (${numAttacks} ataques)`, 'dodge');
-            _log(`⏱️ Primeiro ataque: ${new Date(firstTime * 1000).toLocaleTimeString()}`, 'dodge');
-            _log(`⏱️ Último ataque: ${new Date(lastTime * 1000).toLocaleTimeString()}`, 'dodge');
-            _log(`⏱️ Enviar ${CONFIG.TEMPO_ANTECEDENCIA}s ANTES`, 'dodge');
-            _log(`⏱️ Voltar ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS (${new Date((lastTime + CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000).toLocaleTimeString()})`, 'dodge');
+            _log(`⚡ EXECUTANDO DODGE ${typeLabel} para ${townId} (${attacks.length} ataques)`, 'dodge');
             _playSound('danger');
 
             dodgeState.executedGroups[groupKey] = true;
 
-            // ENVIAR TERRESTRES
             _sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'ground');
 
-            // ENVIAR NAVAIS
             setTimeout(function() {
                 _sendSupportForGroup(townId, destino, firstTime, lastTime, groupKey, 'naval');
             }, CONFIG.DIFERENCA_ENVIO * 1000);
@@ -957,19 +578,16 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 📋 UPDATE PANEL
+    // 📋 UPDATE PANEL - DENTRO DO MULBOT
     // ═══════════════════════════════════════════════════════════════════════
 
     function _updatePanel() {
-        var panel = document.getElementById('herald-panel');
-        if (!panel) return;
-
-        var list = panel.querySelector('.hw-attack-list');
+        var list = document.getElementById('dodge-attack-list');
         if (!list) return;
-        list.innerHTML = '';
 
         var now = _gameNow();
         var attackCount = 0;
+        var html = '';
 
         var groups = [];
         for (var key in dodgeState.groupStatus) {
@@ -982,7 +600,7 @@
         }
 
         if (groups.length === 0) {
-            list.innerHTML = `
+            html = `
                 <div class="hw-empty-state">
                     <div class="hw-empty-icon">🛡️</div>
                     <div>Nenhum ataque detectado</div>
@@ -994,19 +612,6 @@
 
             for (var i = 0; i < groups.length; i++) {
                 var data = groups[i];
-                var item = document.createElement('div');
-                item.className = 'hw-attack-item';
-
-                if (data.dodged) {
-                    item.classList.add('hw-dodged');
-                }
-                if (data.isGroup) {
-                    item.classList.add('hw-group');
-                }
-                if (data.status === 'failed') {
-                    item.classList.add('hw-failed');
-                }
-
                 var timeLeft = Math.round(data.firstTime - now);
                 var timeStr = timeLeft > 0 ? (timeLeft > 60 ? Math.round(timeLeft / 60) + 'm ' + (timeLeft % 60) + 's' : timeLeft + 's') : '💥';
 
@@ -1015,7 +620,7 @@
                 else if (timeLeft < 15 && timeLeft > 0) timeColor = 'hw-warning';
                 else if (timeLeft > 0) timeColor = 'hw-safe';
 
-                var typeLabel = data.isGroup ? '📦 GRUPO' : '🎯 INDIVIDUAL';
+                var typeLabel = data.isGroup ? '📦' : '🎯';
                 var badgeHtml = '';
                 if (data.isGroup) {
                     badgeHtml = `<span class="hw-attack-badge hw-badge-group">${data.attacks.length} ataques</span>`;
@@ -1041,409 +646,156 @@
                 var lastStr = new Date(data.lastTime * 1000).toLocaleTimeString();
                 var returnStr = new Date((data.lastTime + CONFIG.MARGEM_SEGURANCA_RETORNO) * 1000).toLocaleTimeString();
 
-                item.innerHTML = `
-                    <span class="hw-attack-to">🏙️ ${data.townId} → ${data.destino}</span>
-                    <span style="font-size:10px;color:#888;">${typeLabel}</span>
-                    ${badgeHtml}
-                    <span class="hw-attack-time ${timeColor}">⏱️ ${timeStr}</span>
-                    <span style="font-size:9px;color:#666;">${firstStr} → ${lastStr}</span>
-                    <span style="font-size:9px;color:#00b894;">↩️ ${returnStr}</span>
-                    <span class="hw-attack-status ${statusClass}">${statusText}</span>
-                `;
+                var itemClass = 'hw-attack-item';
+                if (data.dodged) itemClass += ' hw-dodged';
+                if (data.isGroup) itemClass += ' hw-group';
+                if (data.status === 'failed') itemClass += ' hw-failed';
 
-                list.appendChild(item);
+                html += `
+                    <div class="${itemClass}">
+                        <span class="hw-attack-to">🏙️ ${data.townId} → ${data.destino}</span>
+                        <span style="font-size:10px;color:#888;">${typeLabel}</span>
+                        ${badgeHtml}
+                        <span class="hw-attack-time ${timeColor}">⏱️ ${timeStr}</span>
+                        <span style="font-size:9px;color:#666;">${firstStr} → ${lastStr}</span>
+                        <span style="font-size:9px;color:#00b894;">↩️ ${returnStr}</span>
+                        <span class="hw-attack-status ${statusClass}">${statusText}</span>
+                    </div>
+                `;
                 attackCount++;
             }
         }
 
-        var counter = panel.querySelector('.hw-count');
+        list.innerHTML = html;
+
+        var counter = document.getElementById('dodge-count');
         if (counter) {
             counter.textContent = attackCount;
             counter.classList.toggle('hw-count-danger', attackCount > 0);
         }
-
-        var icon = document.querySelector('.hw-control-icon');
-        if (icon) {
-            var badge = icon.querySelector('.hw-icon-badge');
-            if (attackCount > 0) {
-                icon.classList.add('hw-has-attacks');
-                if (!badge) {
-                    badge = document.createElement('span');
-                    badge.className = 'hw-icon-badge';
-                    icon.appendChild(badge);
-                }
-                badge.textContent = attackCount;
-            } else {
-                icon.classList.remove('hw-has-attacks');
-                if (badge) badge.remove();
-            }
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🎨 PAINEL
+    // 🎯 CLASSE PARA O MULTOBOT
     // ═══════════════════════════════════════════════════════════════════════
 
-    function _addHeraldIcon() {
-        var icon = document.createElement('span');
-        icon.className = 'hw-control-icon';
-        icon.innerHTML = '🛡️';
-        icon.title = 'Herald SO - Dodge V49.2 FINAL';
+    // Iniciar o sistema automaticamente
+    var _systemActive = false;
+    var _scanInterval = null;
 
-        var target = document.querySelector('#header .controls') ||
-            document.querySelector('.controls') ||
-            document.querySelector('#header-controls');
-
-        if (target) {
-            target.appendChild(icon);
-        } else {
-            var fallback = document.createElement('div');
-            fallback.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,0.7);border-radius:8px;padding:6px;cursor:pointer;';
-            fallback.appendChild(icon);
-            document.body.appendChild(fallback);
-        }
-
-        b.herald.control = icon;
-        icon.addEventListener('click', function() { _showPanel(); });
-        _log('✅ Ícone adicionado', 'success');
-    }
-
-    function _showPanel() {
-        var existing = document.getElementById('herald-panel');
-        if (existing) {
-            existing.style.display = existing.style.display === 'none' ? 'flex' : 'none';
-            return;
-        }
-
-        var panel = document.createElement('div');
-        panel.id = 'herald-panel';
-        panel.innerHTML = `
-            <div class="hw-header">
-                <div class="hw-title">
-                    <span>🛡️</span>
-                    Herald SO
-                    <span style="font-size:9px;background:#6c5ce7;padding:2px 8px;border-radius:10px;color:#fff;">V49.2</span>
-                </div>
-                <div class="hw-controls">
-                    <span class="hw-counter">⚔️ <span class="hw-count">0</span></span>
-                    <button class="hw-close" onclick="this.closest('#herald-panel').style.display='none'">✕</button>
-                </div>
-            </div>
-
-            <div class="hw-toolbar">
-                <input class="hw-search" placeholder="🔍 Filtrar..." oninput="window._hwSearch(this.value)">
-                <button class="hw-btn" onclick="window._hwRefresh()">🔄</button>
-                <button class="hw-btn hw-btn-danger" onclick="window._hwClearAttacks()">🗑️</button>
-                <button class="hw-btn hw-btn-success" onclick="window._hwTestDodge()">🧪</button>
-                <label class="hw-toggle">
-                    <input type="checkbox" ${CONFIG.AUTO_DODGE ? 'checked' : ''} onchange="window._hwToggleDodge(this.checked)">
-                    <span class="hw-toggle-slider"></span>
-                </label>
-            </div>
-
-            <div class="hw-attack-list">
-                <div class="hw-empty-state">
-                    <div class="hw-empty-icon">🛡️</div>
-                    <div>Nenhum ataque detectado</div>
-                </div>
-            </div>
-
-            <div class="hw-footer">
-                ⭐ Menos de ${CONFIG.JANELA_GRUPO}s = GRUPO | ${CONFIG.TEMPO_ANTECEDENCIA}s ANTES | ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS
-            </div>
-        `;
-
-        document.body.appendChild(panel);
-
-        window._hwSearch = function(val) {
-            var items = panel.querySelectorAll('.hw-attack-item');
-            var search = val.toLowerCase();
-            for (var i = 0; i < items.length; i++) {
-                items[i].style.display = items[i].textContent.toLowerCase().indexOf(search) >= 0 ? '' : 'none';
-            }
-        };
-
-        window._hwRefresh = function() {
-            _scanAttacks();
-            _updatePanel();
-        };
-
-        window._hwClearAttacks = function() {
-            if (!confirm('🗑️ Limpar todos os ataques?')) return;
-            for (var key in dodgeState.groupTimers) {
-                clearTimeout(dodgeState.groupTimers[key]);
-            }
-            for (var key in dodgeState.returnTimers) {
-                clearTimeout(dodgeState.returnTimers[key]);
-            }
-            dodgeState.groupStatus = {};
-            dodgeState.groupTimers = {};
-            dodgeState.returnTimers = {};
-            dodgeState.executedGroups = {};
-            troopsSent = {};
-            attackCommands = {};
-            _updatePanel();
-            _log('✅ Todos os ataques foram limpos', 'success');
-        };
-
-        window._hwTestDodge = function() {
-            var towns = Object.keys(CIDADES);
-            if (towns.length === 0) {
-                _log('⚠️ Nenhuma cidade configurada!', 'warning');
-                return;
-            }
-            var townId = parseInt(towns[0]);
-            var destino = CIDADES[townId];
-            var now = _gameNow();
-
-            _log(`🧪 Simulando ataques para ${townId}...`, 'info');
-
-            var tempos = [10, 11, 24, 27, 40];
-
-            var attacks = [];
-            for (var i = 0; i < tempos.length; i++) {
-                var arrival = now + tempos[i];
-                var key = 'sim_' + Date.now() + '_' + i;
-                attacks.push({
-                    cmdId: key,
-                    arrival: arrival,
-                    type: 'mixed'
-                });
-                _log(`🧪 Ataque ${i+1} às ${new Date(arrival * 1000).toLocaleTimeString()}`, 'debug');
-            }
-
-            // Adicionar ataques à cidade
-            cityAttacks = {};
-            cityAttacks[townId] = attacks;
-
-            _log(`🎯 ${attacks.length} ataques simulados!`, 'attack');
-
-            // Processar manualmente
-            var groups = [];
-            var currentGroup = [attacks[0]];
-            for (var i = 1; i < attacks.length; i++) {
-                var gap = attacks[i].arrival - attacks[i-1].arrival;
-                if (gap <= CONFIG.JANELA_GRUPO) {
-                    currentGroup.push(attacks[i]);
-                } else {
-                    groups.push(currentGroup);
-                    currentGroup = [attacks[i]];
-                }
-            }
-            groups.push(currentGroup);
-
-            for (var g = 0; g < groups.length; g++) {
-                var group = groups[g];
-                var firstTime = group[0].arrival;
-                var lastTime = group[group.length - 1].arrival;
-                var groupKey = townId + '_group_' + firstTime + '_' + g;
-                var isGroup = group.length > 1;
-
-                dodgeState.groupStatus[groupKey] = {
-                    townId: townId,
-                    destino: destino,
-                    firstTime: firstTime,
-                    lastTime: lastTime,
-                    attacks: group,
-                    isGroup: isGroup,
-                    status: 'waiting',
-                    dodged: false
-                };
-
-                var dodgeDelay = Math.max(firstTime - now - CONFIG.TEMPO_ANTECEDENCIA, 0) * 1000;
-                setTimeout(function(data, key) {
-                    _executeDodgeForGroup(data.townId, data.destino, data.firstTime, data.lastTime, data.attacks, key, data.isGroup);
-                }.bind(null, dodgeState.groupStatus[groupKey], groupKey), dodgeDelay);
-            }
-
-            _updatePanel();
-        };
-
-        window._hwToggleDodge = function(checked) {
-            CONFIG.AUTO_DODGE = checked;
-            _log(`🛡️ Dodge automático: ${checked ? 'ATIVADO' : 'DESATIVADO'}`, 'info');
-        };
-
+    function _startSystem() {
+        if (_systemActive) return;
+        _systemActive = true;
+        _log('🚀 Sistema Dodge iniciado!', 'info');
+        _scanAttacks();
+        _scanInterval = setInterval(function() { _scanAttacks(); }, CONFIG.INTERVALO_REFRESH_ATAQUES * 1000);
         _updatePanel();
-        _log('📋 Painel aberto', 'success');
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🚀 INICIALIZAÇÃO
-    // ═══════════════════════════════════════════════════════════════════════
+    function _stopSystem() {
+        _systemActive = false;
+        if (_scanInterval) {
+            clearInterval(_scanInterval);
+            _scanInterval = null;
+        }
+        for (var key in dodgeState.groupTimers) {
+            clearTimeout(dodgeState.groupTimers[key]);
+        }
+        for (var key in dodgeState.returnTimers) {
+            clearTimeout(dodgeState.returnTimers[key]);
+        }
+        _log('⏹️ Sistema Dodge parado!', 'info');
+        _updatePanel();
+    }
 
-    // Adicionar CSS primeiro
-    _addStyles();
+    // Exportar para o MultBot
+    window.AutoDodge = class AutoDodge extends MultUtil {
+        constructor(c, s) {
+            super(c, s);
+            _log('🛡️ Dodge Ultimate V49.2 carregado!', 'info');
+            _log('🏙️ ' + Object.keys(CIDADES).length + ' cidades protegidas', 'info');
+            
+            // Iniciar automaticamente
+            setTimeout(function() {
+                _startSystem();
+            }, 1000);
+        }
 
-    var b = {
-        herald: {
-            active: false,
-            control: null,
-            start: function() {
-                if (this.active) return;
-                this.active = true;
-                _log('🚀 Herald SO v49.2 - FINAL FUNCIONAL!', 'info');
-                _log('🏙️ Cidades: ' + Object.keys(CIDADES).join(', '), 'info');
-                _log('📦 Ataques com menos de ' + CONFIG.JANELA_GRUPO + 's = GRUPO', 'group');
-                _log('⭐ Envia ' + CONFIG.TEMPO_ANTECEDENCIA + 's ANTES do primeiro', 'dodge');
-                _log('⭐ Volta ' + CONFIG.MARGEM_SEGURANCA_RETORNO + 's APÓS o último', 'dodge');
-                _log('🔴 ATUALIZAÇÃO EM TEMPO REAL!', 'success');
+        settings() {
+            var isActive = _systemActive;
+            
+            return `
+                <div class="game_border" style="margin-bottom:20px;">
+                    <div class="game_border_top"></div>
+                    <div class="game_border_bottom"></div>
+                    <div class="game_border_left"></div>
+                    <div class="game_border_right"></div>
+                    <div class="game_border_corner corner1"></div>
+                    <div class="game_border_corner corner2"></div>
+                    <div class="game_border_corner corner3"></div>
+                    <div class="game_border_corner corner4"></div>
+                    
+                    <div style="padding:8px 12px;background:#1a1a2e;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-weight:bold;font-size:14px;color:#a29bfe;">🛡️ Dodge Ultimate V49.2 - <span style="color:${isActive ? '#00b894' : '#888'};">${isActive ? '🟢 ATIVO' : '🔴 INATIVO'}</span></span>
+                        <button onclick="window._toggleDodgeSystem()" style="padding:4px 16px;border-radius:6px;border:none;cursor:pointer;background:${isActive ? '#ff6b6b' : '#00b894'};color:#fff;font-weight:bold;font-size:12px;">
+                            ${isActive ? 'PARAR' : 'INICIAR'}
+                        </button>
+                    </div>
+                    
+                    <div style="padding:5px 12px;font-size:11px;background:#0f0f1a;border-bottom:1px solid #333;display:flex;flex-wrap:wrap;gap:10px;color:#aaa;">
+                        <span>📦 Grupo: ${CONFIG.JANELA_GRUPO}s</span>
+                        <span>⭐ ${CONFIG.TEMPO_ANTECEDENCIA}s ANTES</span>
+                        <span>⏱️ ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS</span>
+                        <span>🏙️ ${Object.keys(CIDADES).length} cidades</span>
+                        <span class="hw-counter">⚔️ <span class="hw-count" id="dodge-count">0</span></span>
+                    </div>
+                    
+                    <div style="padding:5px 12px;font-size:10px;color:#666;background:#0a0a15;border-bottom:1px solid #333;display:flex;gap:15px;flex-wrap:wrap;">
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#74b9ff;vertical-align:middle;"></span> Aguardando</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#00b894;vertical-align:middle;"></span> Desviado</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fdcb6e;vertical-align:middle;"></span> Voltou</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ff6b6b;vertical-align:middle;"></span> Falhou</span>
+                    </div>
+                    
+                    <div id="dodge-attack-list" style="padding:5px 12px;min-height:80px;max-height:300px;overflow-y:auto;background:#0a0a15;">
+                        <div class="hw-empty-state">
+                            <div class="hw-empty-icon">🛡️</div>
+                            <div>Nenhum ataque detectado</div>
+                            <div style="font-size:10px;color:#555;margin-top:4px;">${Object.keys(CIDADES).length} cidades protegidas</div>
+                        </div>
+                    </div>
+                    
+                    <div style="padding:4px 12px;font-size:9px;color:#555;background:#0f0f1a;border-top:1px solid #333;text-align:center;">
+                        Dodge Ultimate V49.2 - Agrupamento + Recall Automático
+                    </div>
+                </div>
+            `;
+        }
 
-                _addHeraldIcon();
-                _scanAttacks();
-
-                setInterval(function() { _scanAttacks(); }, CONFIG.INTERVALO_REFRESH_ATAQUES * 1000);
-
-                _log('✅ Sistema ativo!', 'success');
-            },
-            status: function() {
-                var total = 0;
-                for (var key in dodgeState.groupStatus) {
-                    if (dodgeState.groupStatus.hasOwnProperty(key)) {
-                        var data = dodgeState.groupStatus[key];
-                        if (data && !data.dodged && data.lastTime > _gameNow()) {
-                            total++;
-                        }
-                    }
-                }
-                _log(`📊 ${total} grupos pendentes`, 'info');
-                return { groups: total };
+        toggle() {
+            if (_systemActive) {
+                _stopSystem();
+            } else {
+                _startSystem();
             }
         }
     };
 
-    function _waitForGrepolis(callback, maxAttempts) {
-        maxAttempts = maxAttempts || 60;
-        var attempts = 0;
-        var check = function() {
-            attempts++;
-            try {
-                if (typeof unsafeWindow !== 'undefined' && unsafeWindow.Game && unsafeWindow.Game.townId) {
-                    callback();
-                    return;
-                }
-            } catch(e) {}
-            if (attempts < maxAttempts) { setTimeout(check, 500); }
-            else { console.log('[HERALD] ⚠️ Grepolis não carregou'); }
-        };
-        check();
-    }
+    // Função global para o botão Iniciar/Parar
+    window._toggleDodgeSystem = function() {
+        if (_systemActive) {
+            _stopSystem();
+        } else {
+            _startSystem();
+        }
+        // Recarregar o módulo no MultBot
+        if (window.MultBot && window.MultBot.loadModule) {
+            window.MultBot.loadModule('AutoDodge');
+        }
+    };
 
-    _waitForGrepolis(function() {
-        console.log('[HERALD] 🚀 Grepolis detetado!');
-        if (b.herald.start) b.herald.start();
-
-        try {
-            var win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
-            if (win) {
-                win.b = b;
-                win.herald = b.herald;
-                win.dodgeState = dodgeState;
-                console.log('[HERALD] 🌐 Variáveis EXPORTADAS');
-                console.log('[HERALD] 💡 Comandos:');
-                console.log('  - b.herald.status() → Ver status');
-                console.log('  - dodgeState.groupStatus → Ver todos os grupos');
-            }
-        } catch(e) {}
-
-        console.log('[HERALD] ✅ Herald SO v49.2 - FINAL FUNCIONAL!');
-        console.log('[HERALD] 📦 Ataques com menos de ' + CONFIG.JANELA_GRUPO + 's = GRUPO');
-        console.log('[HERALD] 🔴 ATUALIZAÇÃO EM TEMPO REAL!');
-    }, 120);
-
-    console.log('[HERALD] 🛡️ Herald SO v49.2 - FINAL FUNCIONAL!');
-    console.log('[HERALD] 📦 Ataques com menos de ' + CONFIG.JANELA_GRUPO + 's = GRUPO');
-    console.log('[HERALD] 🔴 ATUALIZAÇÃO EM TEMPO REAL!');
-
-       // ═══════════════════════════════════════════════════════════════════════
-    // 📦 EXPORTAR PARA O MULTBOT
-    // ═══════════════════════════════════════════════════════════════════════
-
-    // Garantir que _showPanel está disponível globalmente
-    window._showPanel = _showPanel;
-    window._scanAttacks = _scanAttacks;
-    window._updatePanel = _updatePanel;
-
-    // Exportar a classe para o escopo global
-    if (typeof window !== 'undefined') {
-        // Criar uma classe wrapper para o MultBot
-        window.AutoDodge = class AutoDodge extends MultUtil {
-            constructor(c, s) {
-                super(c, s);
-                // Iniciar o sistema automaticamente
-                setTimeout(() => {
-                    if (typeof b !== 'undefined' && b.herald && !b.herald.active) {
-                        b.herald.start();
-                    }
-                }, 1000);
-            }
-
-            settings() {
-                // Retornar o painel para a aba
-                return `
-                    <div class="game_border" style="margin-bottom:20px;">
-                        <div class="game_border_top"></div>
-                        <div class="game_border_bottom"></div>
-                        <div class="game_border_left"></div>
-                        <div class="game_border_right"></div>
-                        <div class="game_border_corner corner1"></div>
-                        <div class="game_border_corner corner2"></div>
-                        <div class="game_border_corner corner3"></div>
-                        <div class="game_border_corner corner4"></div>
-                        <div style="padding:15px 20px;text-align:center;background:#1a1a2e;border-radius:8px;">
-                            <div style="font-size:18px;font-weight:bold;color:#a29bfe;margin-bottom:10px;">
-                                🛡️ Dodge Ultimate V49.2
-                            </div>
-                            <div style="font-size:12px;color:#888;margin-bottom:15px;">
-                                ${Object.keys(CIDADES).length} cidades protegidas<br>
-                                📦 Grupo: ${CONFIG.JANELA_GRUPO}s | ⭐ ${CONFIG.TEMPO_ANTECEDENCIA}s ANTES | ${CONFIG.MARGEM_SEGURANCA_RETORNO}s APÓS
-                            </div>
-                            <button onclick="if(window._showPanel) { window._showPanel(); } else { var icon = document.querySelector('.hw-control-icon'); if(icon) icon.click(); }" style="
-                                padding:10px 30px;
-                                background:#6c5ce7;
-                                color:#fff;
-                                border:none;
-                                border-radius:8px;
-                                font-size:14px;
-                                font-weight:bold;
-                                cursor:pointer;
-                                transition:0.3s;
-                            " onmouseover="this.style.background='#5a4bd1'" onmouseout="this.style.background='#6c5ce7'">
-                                🛡️ ABRIR DODGE
-                            </button>
-                            <div style="font-size:10px;color:#555;margin-top:10px;">
-                                Clique no ícone 🛡️ no canto superior direito ou neste botão
-                            </div>
-                            <div style="font-size:10px;color:#00b894;margin-top:5px;">
-                                ✅ Sistema ativo - ${b.herald.active ? '🔴 ATIVO' : '⏸️ INATIVO'}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            toggle() {
-                if (b.herald.active) {
-                    // Fechar o painel se estiver aberto
-                    var panel = document.getElementById('herald-panel');
-                    if (panel) {
-                        panel.style.display = 'none';
-                    }
-                    b.herald.active = false;
-                } else {
-                    b.herald.start();
-                    // Abrir o painel
-                    setTimeout(function() {
-                        if (window._showPanel) {
-                            window._showPanel();
-                        }
-                    }, 500);
-                }
-            }
-        };
-
-        console.log('[AutoDodge] ✅ Classe AutoDodge exportada para o MultBot');
-        console.log('[AutoDodge] ✅ _showPanel exportada para window');
-    }
+    console.log('[AutoDodge] 🛡️ Dodge Ultimate V49.2');
+    console.log('[AutoDodge] 📦 Ataques com menos de ' + CONFIG.JANELA_GRUPO + 's = GRUPO');
+    console.log('[AutoDodge] 🏙️ ' + Object.keys(CIDADES).length + ' cidades protegidas');
 
 })();

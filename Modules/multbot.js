@@ -58,8 +58,12 @@ var MultBot = class {
         this.autoAttack         = this._safeInit('AutoDodge', () => new AutoDodge(this.console, this.storage));
         this.autoAresSacrifice  = this._safeInit('AutoAresSacrifice', () => new AutoAresSacrifice(this.console, this.storage));
         this.autoResearch       = this._safeInit('AutoResearch', () => new AutoResearch(this.console, this.storage));
-        this.autoSendResources  = this._safeInit('AutoSendResources', () => new AutoSendResources(this.console, this.storage));
+        // ⭐ MOVIDO AutoSendResources para a aba "Send Free"
+        // this.autoSendResources  = this._safeInit('AutoSendResources', () => new AutoSendResources(this.console, this.storage));
         this.statusPanel        = this._safeInit('StatusPanel', () => new StatusPanel(this.console, this.storage));
+
+        // ⭐ NOVA ABA "SEND FREE" - Inicializa o AutoSendResources aqui
+        this.autoSendResources  = this._safeInit('AutoSendResources', () => new AutoSendResources(this.console, this.storage));
 
         this.settingsFactory = this._safeInit('SettingsWindow', () => new createGrepoWindow({
             id: 'MULT_BOT',
@@ -95,6 +99,12 @@ var MultBot = class {
                     title: multT('tab_attack'),
                     id: 'attack',
                     render: this.settingsAttack,
+                },
+                // ⭐ NOVA ABA "SEND FREE"
+                {
+                    title: '📤 Send Free',
+                    id: 'send_free',
+                    render: this.settingsSendFree,
                 },
                 {
                     title: multT('tab_mult'),
@@ -140,6 +150,13 @@ var MultBot = class {
         let html = '';
         html += this.autoRuralLevel ? this.autoRuralLevel.settings() : this._missingModuleHtml('Auto Rural Level');
         html += this.autoRuralTrade ? this.autoRuralTrade.settings() : this._missingModuleHtml('Auto Rural Trade');
+        // ⭐ REMOVIDO AutoSendResources daqui (movido para "Send Free")
+        return html;
+    };
+
+    // ⭐ NOVA ABA "SEND FREE"
+    settingsSendFree = () => {
+        let html = '';
         html += this.autoSendResources ? this.autoSendResources.settings() : this._missingModuleHtml('Auto Send Resources');
         return html;
     };
@@ -158,7 +175,6 @@ var MultBot = class {
         html += this.autoParty ? this.autoParty.settings() : this._missingModuleHtml('Auto Party');
         html += this.autoHide ? this.autoHide.settings() : this._missingModuleHtml('Auto Hide');
         html += this.autoMilitia ? this.autoMilitia.settings() : this._missingModuleHtml('Auto Militia');
-        // ⭐ REMOVIDO: html += this.autoDodge ? this.autoDodge.settings() : this._missingModuleHtml('Auto Dodge');
         html += this.autoQuest ? this.autoQuest.settings() : this._missingModuleHtml('Auto Quest');
         return html;
     };

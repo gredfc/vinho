@@ -1,13 +1,4 @@
-// Tentar usar GM_addStyle se disponível, senão usar método alternativo
-if (typeof GM_addStyle !== 'undefined') {
-    // Usar GM_addStyle normalmente
-    GM_addStyle(`...`);
-} else {
-    // Fallback: criar elemento style manualmente
-    var style = document.createElement('style');
-    style.textContent = `...`;
-    document.head.appendChild(style);
-}
+
 
 // ==UserScript==
 // @name         BOt melhor - Dodge Ultimate V49.2 FINAL FUNCIONAL

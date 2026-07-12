@@ -19,241 +19,7 @@ if (typeof GM_addStyle === 'undefined') {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 📦 MULTBOT - COM OVERRIDE DO AutoSendResources
-// ═══════════════════════════════════════════════════════════════════════
-
-// ⭐ PRIMEIRO: Define a tua versão do AutoSendResources ANTES do MultBot
-// Isto vai sobrepor o módulo que vem do servidor
-
-class AutoSendResources extends MultUtil {
-    constructor(c, s) {
-        super(c, s);
-        this._active = false;
-        this._intervalId = null;
-        this._lastRun = null;
-
-        // ═══════════════════════════════════════════════════════
-        //  CONFIGURAÇÃO - EDITA AQUI!
-        // ═══════════════════════════════════════════════════════
-        this.FROM = 154;
-        this.TO = 2195;
-        this.AMOUNT = 500;
-        this.INTERVALO = 1200; // 20 minutos em segundos
-        // ═══════════════════════════════════════════════════════
-
-        if (this.storage.load('asr_active', false)) {
-            setTimeout(() => this.start(), 2500);
-        }
-    }
-
-    settings = () => {
-        requestAnimationFrame(() => this._updateTitle());
-        return `
-        <div class="game_border" style="margin-bottom:20px;">
-            <div class="game_border_top"></div><div class="game_border_bottom"></div>
-            <div class="game_border_left"></div><div class="game_border_right"></div>
-            <div class="game_border_corner corner1"></div><div class="game_border_corner corner2"></div>
-            <div class="game_border_corner corner3"></div><div class="game_border_corner corner4"></div>
-            ${this.getTitleHtml('asr_title', `📦 Envio ${this.FROM} → ${this.TO} (${this.AMOUNT} cada - 20min)`, this.toggle, '', this._active)}
-            <div style="padding:5px 10px;font-weight:bold;color:#2c1810;">
-                📤 Envia ${this.AMOUNT} madeira + ${this.AMOUNT} pedra + ${this.AMOUNT} prata (${this.AMOUNT * 3} total) a cada 20 minutos
-            </div>
-            <div style="padding:2px 10px 4px;font-size:11px;color:#5a3a0a;">
-                📍 ${this.FROM} → ${this.TO} | ⏱ 20 min | ✅ Recursos ≥ ${this.AMOUNT} cada + Capacidade ≥ ${this.AMOUNT * 3}
-            </div>
-            <div id="asr_log" style="padding:2px 10px 8px;font-size:12px;color:#2c1810;min-height:18px;font-weight:bold;"></div>
-            <div style="padding:0 10px 4px;font-size:10px;color:#888;border-top:1px solid #ddd;margin-top:2px;">
-                ⏱ Última verificação: <span id="asr_timestamp">Aguardando...</span>
-            </div>
-        </div>`;
-    };
-
-    toggle = () => {
-        if (this._active) this.stop();
-        else this.start();
-    };
-
-    start() {
-        if (this._active) return;
-        this._active = true;
-        this.storage.save('asr_active', true);
-        this._updateTitle();
-        this.console.log(`[AutoSend] ✅ Iniciado! ${this.FROM} → ${this.TO} | ${this.AMOUNT} de cada | 20min`);
-        this._tick();
-        this._intervalId = setInterval(() => this._tick(), this.INTERVALO * 1000);
-    }
-
-    stop() {
-        this._active = false;
-        this.storage.save('asr_active', false);
-        if (this._intervalId) {
-            clearInterval(this._intervalId);
-            this._intervalId = null;
-        }
-        this._updateTitle();
-        this.console.log('[AutoSend] ⏹ Parado.');
-        const logEl = uw.$('#asr_log');
-        if (logEl.length) logEl.text('⏹ Desativado');
-    }
-
-    _updateTitle() {
-        const title = uw.$('#asr_title');
-        if (title.length) {
-            title.css('filter', this._active
-                ? 'brightness(100%) saturate(186%) hue-rotate(241deg)'
-                : '');
-        }
-    }
-
-    async _tick() {
-        const logEl = uw.$('#asr_log');
-        const timestampEl = uw.$('#asr_timestamp');
-        const horaAtual = new Date().toLocaleTimeString();
-
-        if (timestampEl.length) {
-            timestampEl.text(horaAtual);
-        }
-
-        this.console.log(`[AutoSend] 🔍 Verificando ${this.FROM} → ${this.TO}...`);
-
-        try {
-            if (typeof ITowns === 'undefined' || !ITowns.towns || Object.keys(ITowns.towns).length === 0) {
-                if (logEl.length) {
-                    logEl.text('⏳ Aguardando jogo...');
-                    logEl.css('color', '#ffff00');
-                }
-                return;
-            }
-
-            const from = ITowns.towns[this.FROM];
-            const to = ITowns.towns[this.TO];
-
-            if (!from || !to) {
-                if (logEl.length) {
-                    logEl.text(`❌ Cidade ${this.FROM} ou ${this.TO} não existe!`);
-                    logEl.css('color', '#ff0000');
-                }
-                return;
-            }
-
-            const res = from.resources();
-            const capacity = from.getAvailableTradeCapacity();
-
-            if (res.wood < this.AMOUNT || res.stone < this.AMOUNT || res.iron < this.AMOUNT) {
-                if (logEl.length) {
-                    logEl.text(`${horaAtual} ⏸ 🪵${Math.floor(res.wood)} 🪨${Math.floor(res.stone)} ⚙${Math.floor(res.iron)}`);
-                    logEl.css('color', '#ffff00');
-                }
-                return;
-            }
-
-            if (capacity < this.AMOUNT * 3) {
-                if (logEl.length) {
-                    logEl.text(`${horaAtual} ⏸ Cap: ${capacity}`);
-                    logEl.css('color', '#ffff00');
-                }
-                return;
-            }
-
-            if (logEl.length) {
-                logEl.text(`${horaAtual} ⏳ Enviando ${this.AMOUNT} de cada...`);
-                logEl.css('color', '#ffff00');
-            }
-
-            const resultado = await this._sendResources(this.FROM, this.TO, this.AMOUNT);
-
-            if (resultado) {
-                if (logEl.length) {
-                    logEl.text(`${horaAtual} ✅ ${this.AMOUNT} de cada enviado!`);
-                    logEl.css('color', '#00ff00');
-                }
-                this.console.log(`[AutoSend] ✅ ${this.AMOUNT} de cada → ${to.getName()}`);
-            } else {
-                if (logEl.length) {
-                    logEl.text(`${horaAtual} ❌ Falha no envio`);
-                    logEl.css('color', '#ff0000');
-                }
-                this.console.log(`[AutoSend] ❌ Falha ao enviar`);
-            }
-
-        } catch(e) {
-            if (logEl.length) {
-                logEl.text(`❌ ${e.message}`);
-                logEl.css('color', '#ff0000');
-            }
-            this.console.log(`[AutoSend] ❌ Erro: ${e.message}`);
-        }
-    }
-
-    _sendResources(fromId, toId, amount) {
-        return new Promise((resolve) => {
-            try {
-                const data = {
-                    id: parseInt(toId),
-                    wood: amount,
-                    stone: amount,
-                    iron: amount,
-                    town_id: parseInt(fromId),
-                    nl_init: true
-                };
-
-                if (Game && Game.csrfToken) {
-                    data.csrf_token = Game.csrfToken;
-                    data.token = Game.csrfToken;
-                }
-
-                const timer = setTimeout(() => resolve(false), 15000);
-
-                if (typeof GPAjax !== 'undefined' && GPAjax.ajaxPost) {
-                    GPAjax.ajaxPost('town_info', 'trade', data, true,
-                        res => { clearTimeout(timer); resolve(res && !res.error); },
-                        () => { clearTimeout(timer); resolve(false); }
-                    );
-                    return;
-                }
-
-                if (typeof gpAjax !== 'undefined' && gpAjax.ajaxPost) {
-                    gpAjax.ajaxPost('town_info', 'trade', data, true,
-                        res => { clearTimeout(timer); resolve(res && !res.error); },
-                        () => { clearTimeout(timer); resolve(false); }
-                    );
-                    return;
-                }
-
-                if (typeof $ !== 'undefined' && $.ajax) {
-                    $.ajax({
-                        url: '/game/action/town_info/trade',
-                        method: 'POST',
-                        data: data,
-                        dataType: 'json',
-                        success: (res) => { clearTimeout(timer); resolve(res && !res.error); },
-                        error: () => { clearTimeout(timer); resolve(false); }
-                    });
-                    return;
-                }
-
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', '/game/action/town_info/trade', true);
-                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-                xhr.onload = function() {
-                    clearTimeout(timer);
-                    try { resolve(JSON.parse(xhr.responseText)?.error ? false : true); }
-                    catch(e) { resolve(false); }
-                };
-                xhr.onerror = function() { clearTimeout(timer); resolve(false); };
-                xhr.send(new URLSearchParams(data));
-
-            } catch(e) {
-                console.error('❌ Erro ao enviar:', e);
-                resolve(false);
-            }
-        });
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// 📦 MULTBOT - CONTINUAÇÃO
+// 📦 MULTBOT - COM OVERRIDE DO AutoSendResources APÓS CARREGAR
 // ═══════════════════════════════════════════════════════════════════════
 
 var MultBot = class {
@@ -290,9 +56,213 @@ var MultBot = class {
         this.autoResearch       = this._safeInit('AutoResearch', () => new AutoResearch(this.console, this.storage));
         this.statusPanel        = this._safeInit('StatusPanel', () => new StatusPanel(this.console, this.storage));
 
-        // ⭐ O AutoSendResources agora é a tua versão (definida acima)
-        // O MultBot vai usar a tua classe em vez da do servidor
+        // ⭐ O AutoSendResources é carregado do servidor
+        // Depois vamos substituir o settings dele
         this.autoSendResources  = this._safeInit('AutoSendResources', () => new AutoSendResources(this.console, this.storage));
+
+        // ⭐ SUBSTITUI O settings DO MÓDULO CARREGADO PELO TEU
+        if (this.autoSendResources) {
+            // Guarda referência ao original
+            const originalSettings = this.autoSendResources.settings;
+            const originalToggle = this.autoSendResources.toggle;
+            const originalStart = this.autoSendResources.start;
+            const originalStop = this.autoSendResources.stop;
+            const originalTick = this.autoSendResources._tick;
+            const originalSend = this.autoSendResources._sendResources;
+
+            // ═══════════════════════════════════════════════════════
+            //  CONFIGURAÇÃO DO TEU SCRIPT
+            // ═══════════════════════════════════════════════════════
+            const FROM = 154;
+            const TO = 2195;
+            const AMOUNT = 500;
+            const INTERVALO = 1200; // 20 minutos
+            // ═══════════════════════════════════════════════════════
+
+            // Substitui o método settings
+            this.autoSendResources.settings = function() {
+                requestAnimationFrame(() => this._updateTitle());
+                return `
+                <div class="game_border" style="margin-bottom:20px;">
+                    <div class="game_border_top"></div><div class="game_border_bottom"></div>
+                    <div class="game_border_left"></div><div class="game_border_right"></div>
+                    <div class="game_border_corner corner1"></div><div class="game_border_corner corner2"></div>
+                    <div class="game_border_corner corner3"></div><div class="game_border_corner corner4"></div>
+                    ${this.getTitleHtml('asr_title', `📦 Envio ${FROM} → ${TO} (${AMOUNT} cada - 20min)`, this.toggle, '', this._active)}
+                    <div style="padding:5px 10px;font-weight:bold;color:#2c1810;">
+                        📤 Envia ${AMOUNT} madeira + ${AMOUNT} pedra + ${AMOUNT} prata (${AMOUNT * 3} total) a cada 20 minutos
+                    </div>
+                    <div style="padding:2px 10px 4px;font-size:11px;color:#5a3a0a;">
+                        📍 ${FROM} → ${TO} | ⏱ 20 min | ✅ Recursos ≥ ${AMOUNT} cada + Capacidade ≥ ${AMOUNT * 3}
+                    </div>
+                    <div id="asr_log" style="padding:2px 10px 8px;font-size:12px;color:#2c1810;min-height:18px;font-weight:bold;"></div>
+                    <div style="padding:0 10px 4px;font-size:10px;color:#888;border-top:1px solid #ddd;margin-top:2px;">
+                        ⏱ Última verificação: <span id="asr_timestamp">Aguardando...</span>
+                    </div>
+                </div>`;
+            };
+
+            // Substitui o _tick
+            this.autoSendResources._tick = async function() {
+                const logEl = uw.$('#asr_log');
+                const timestampEl = uw.$('#asr_timestamp');
+                const horaAtual = new Date().toLocaleTimeString();
+
+                if (timestampEl.length) {
+                    timestampEl.text(horaAtual);
+                }
+
+                this.console.log(`[AutoSend] 🔍 Verificando ${FROM} → ${TO}...`);
+
+                try {
+                    if (typeof ITowns === 'undefined' || !ITowns.towns || Object.keys(ITowns.towns).length === 0) {
+                        if (logEl.length) {
+                            logEl.text('⏳ Aguardando jogo...');
+                            logEl.css('color', '#ffff00');
+                        }
+                        return;
+                    }
+
+                    const from = ITowns.towns[FROM];
+                    const to = ITowns.towns[TO];
+
+                    if (!from || !to) {
+                        if (logEl.length) {
+                            logEl.text(`❌ Cidade ${FROM} ou ${TO} não existe!`);
+                            logEl.css('color', '#ff0000');
+                        }
+                        return;
+                    }
+
+                    const res = from.resources();
+                    const capacity = from.getAvailableTradeCapacity();
+
+                    if (res.wood < AMOUNT || res.stone < AMOUNT || res.iron < AMOUNT) {
+                        if (logEl.length) {
+                            logEl.text(`${horaAtual} ⏸ 🪵${Math.floor(res.wood)} 🪨${Math.floor(res.stone)} ⚙${Math.floor(res.iron)}`);
+                            logEl.css('color', '#ffff00');
+                        }
+                        return;
+                    }
+
+                    if (capacity < AMOUNT * 3) {
+                        if (logEl.length) {
+                            logEl.text(`${horaAtual} ⏸ Cap: ${capacity}`);
+                            logEl.css('color', '#ffff00');
+                        }
+                        return;
+                    }
+
+                    if (logEl.length) {
+                        logEl.text(`${horaAtual} ⏳ Enviando ${AMOUNT} de cada...`);
+                        logEl.css('color', '#ffff00');
+                    }
+
+                    const resultado = await this._sendResources(FROM, TO, AMOUNT);
+
+                    if (resultado) {
+                        if (logEl.length) {
+                            logEl.text(`${horaAtual} ✅ ${AMOUNT} de cada enviado!`);
+                            logEl.css('color', '#00ff00');
+                        }
+                        this.console.log(`[AutoSend] ✅ ${AMOUNT} de cada → ${to.getName()}`);
+                    } else {
+                        if (logEl.length) {
+                            logEl.text(`${horaAtual} ❌ Falha no envio`);
+                            logEl.css('color', '#ff0000');
+                        }
+                        this.console.log(`[AutoSend] ❌ Falha ao enviar`);
+                    }
+
+                } catch(e) {
+                    if (logEl.length) {
+                        logEl.text(`❌ ${e.message}`);
+                        logEl.css('color', '#ff0000');
+                    }
+                    this.console.log(`[AutoSend] ❌ Erro: ${e.message}`);
+                }
+            };
+
+            // Substitui o _sendResources
+            this.autoSendResources._sendResources = function(fromId, toId, amount) {
+                return new Promise((resolve) => {
+                    try {
+                        const data = {
+                            id: parseInt(toId),
+                            wood: amount,
+                            stone: amount,
+                            iron: amount,
+                            town_id: parseInt(fromId),
+                            nl_init: true
+                        };
+
+                        if (Game && Game.csrfToken) {
+                            data.csrf_token = Game.csrfToken;
+                            data.token = Game.csrfToken;
+                        }
+
+                        const timer = setTimeout(() => resolve(false), 15000);
+
+                        if (typeof GPAjax !== 'undefined' && GPAjax.ajaxPost) {
+                            GPAjax.ajaxPost('town_info', 'trade', data, true,
+                                res => { clearTimeout(timer); resolve(res && !res.error); },
+                                () => { clearTimeout(timer); resolve(false); }
+                            );
+                            return;
+                        }
+
+                        if (typeof gpAjax !== 'undefined' && gpAjax.ajaxPost) {
+                            gpAjax.ajaxPost('town_info', 'trade', data, true,
+                                res => { clearTimeout(timer); resolve(res && !res.error); },
+                                () => { clearTimeout(timer); resolve(false); }
+                            );
+                            return;
+                        }
+
+                        if (typeof $ !== 'undefined' && $.ajax) {
+                            $.ajax({
+                                url: '/game/action/town_info/trade',
+                                method: 'POST',
+                                data: data,
+                                dataType: 'json',
+                                success: (res) => { clearTimeout(timer); resolve(res && !res.error); },
+                                error: () => { clearTimeout(timer); resolve(false); }
+                            });
+                            return;
+                        }
+
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/game/action/town_info/trade', true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                        xhr.onload = function() {
+                            clearTimeout(timer);
+                            try { resolve(JSON.parse(xhr.responseText)?.error ? false : true); }
+                            catch(e) { resolve(false); }
+                        };
+                        xhr.onerror = function() { clearTimeout(timer); resolve(false); };
+                        xhr.send(new URLSearchParams(data));
+
+                    } catch(e) {
+                        console.error('❌ Erro ao enviar:', e);
+                        resolve(false);
+                    }
+                });
+            };
+
+            // Substitui o start para usar as novas configurações
+            this.autoSendResources.start = function() {
+                if (this._active) return;
+                this._active = true;
+                this.storage.save('asr_active', true);
+                this._updateTitle();
+                this.console.log(`[AutoSend] ✅ Iniciado! ${FROM} → ${TO} | ${AMOUNT} de cada | 20min`);
+                this._tick();
+                this._intervalId = setInterval(() => this._tick(), INTERVALO * 1000);
+            };
+
+            console.log('[MultBot] ✅ AutoSendResources personalizado com sucesso!');
+        }
 
         this.settingsFactory = this._safeInit('SettingsWindow', () => new createGrepoWindow({
             id: 'MULT_BOT',

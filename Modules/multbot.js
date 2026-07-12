@@ -57,7 +57,7 @@ var MultBot = class {
         this.autoResearch       = this._safeInit('AutoResearch', () => new AutoResearch(this.console, this.storage));
         this.statusPanel        = this._safeInit('StatusPanel', () => new StatusPanel(this.console, this.storage));
 
-        // ⭐ AUTO SEND RESOURCES (TEU SCRIPT) - Inicializado e integrado
+        // ⭐ TEU SCRIPT AUTO SEND RESOURCES - Inicializado e integrado
         this.autoSendResources  = this._safeInit('AutoSendResources', () => new AutoSendResources(this.console, this.storage));
 
         this.settingsFactory = this._safeInit('SettingsWindow', () => new createGrepoWindow({
@@ -95,7 +95,7 @@ var MultBot = class {
                     id: 'attack',
                     render: this.settingsAttack,
                 },
-                // ⭐ NOVA ABA "SEND FREE" COM O TEU SCRIPT
+                // ⭐ ABA "SEND FREE" COM O TEU SCRIPT
                 {
                     title: '📤 Send Free',
                     id: 'send_free',
@@ -267,7 +267,7 @@ if (!window.__multbot_loaded__) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 📦 AUTO SEND RESOURCES - TEU SCRIPT INTEGRADO
+// 📦 AUTO SEND RESOURCES - TEU SCRIPT INTEGRADO (COMO CLASSE MultUtil)
 // ═══════════════════════════════════════════════════════════════════════
 
 class AutoSendResources extends MultUtil {
@@ -278,7 +278,7 @@ class AutoSendResources extends MultUtil {
         this._lastRun = null;
 
         // ═══════════════════════════════════════════════════════
-        //  CONFIGURAÇÃO DO TEU SCRIPT
+        //  CONFIGURAÇÃO DO TEU SCRIPT - IGUAL AO ORIGINAL
         // ═══════════════════════════════════════════════════════
         this.FROM = 154;
         this.TO = 2195;
@@ -301,10 +301,10 @@ class AutoSendResources extends MultUtil {
             <div class="game_border_corner corner3"></div><div class="game_border_corner corner4"></div>
             ${this.getTitleHtml('asr_title', `📦 Envio ${this.FROM} → ${this.TO} (${this.AMOUNT} cada - 20min)`, this.toggle, '', this._active)}
             <div style="padding:5px 10px;font-weight:bold;color:#2c1810;">
-                Envia ${this.AMOUNT} madeira + ${this.AMOUNT} pedra + ${this.AMOUNT} prata (${this.AMOUNT * 3} total) a cada 20 minutos
+                📤 Envia ${this.AMOUNT} madeira + ${this.AMOUNT} pedra + ${this.AMOUNT} prata (${this.AMOUNT * 3} total) a cada 20 minutos
             </div>
             <div style="padding:2px 10px 4px;font-size:11px;color:#5a3a0a;">
-                📍 ${this.FROM} → ${this.TO} | ⏱ 20 min | ✅ Condições: recursos ≥ ${this.AMOUNT} cada + capacidade ≥ ${this.AMOUNT * 3}
+                📍 ${this.FROM} → ${this.TO} | ⏱ 20 min | ✅ Recursos ≥ ${this.AMOUNT} cada + Capacidade ≥ ${this.AMOUNT * 3}
             </div>
             <div id="asr_log" style="padding:2px 10px 8px;font-size:12px;color:#2c1810;min-height:18px;font-weight:bold;"></div>
             <div style="padding:0 10px 4px;font-size:10px;color:#888;border-top:1px solid #ddd;margin-top:2px;">
@@ -337,7 +337,8 @@ class AutoSendResources extends MultUtil {
         }
         this._updateTitle();
         this.console.log('[AutoSend] ⏹ Parado.');
-        uw.$('#asr_log').text('⏹ Desativado');
+        const logEl = uw.$('#asr_log');
+        if (logEl.length) logEl.text('⏹ Desativado');
     }
 
     _updateTitle() {
@@ -414,7 +415,7 @@ class AutoSendResources extends MultUtil {
                     logEl.text(`${horaAtual} ✅ ${this.AMOUNT} de cada enviado!`);
                     logEl.css('color', '#00ff00');
                 }
-                this.console.log(`[AutoSend] ✅ Enviado ${this.AMOUNT} de cada → ${to.getName()}`);
+                this.console.log(`[AutoSend] ✅ ${this.AMOUNT} de cada → ${to.getName()}`);
             } else {
                 if (logEl.length) {
                     logEl.text(`${horaAtual} ❌ Falha no envio`);
@@ -432,6 +433,9 @@ class AutoSendResources extends MultUtil {
         }
     }
 
+    // ═══════════════════════════════════════════════════════
+    // FUNÇÃO DE ENVIO - IGUAL AO TEU SCRIPT
+    // ═══════════════════════════════════════════════════════
     _sendResources(fromId, toId, amount) {
         return new Promise((resolve) => {
             try {
@@ -453,6 +457,7 @@ class AutoSendResources extends MultUtil {
                     resolve(false);
                 }, 15000);
 
+                // 1. GPAjax.ajaxPost
                 if (typeof GPAjax !== 'undefined' && GPAjax.ajaxPost) {
                     GPAjax.ajaxPost('town_info', 'trade', data, true,
                         res => {
@@ -467,6 +472,7 @@ class AutoSendResources extends MultUtil {
                     return;
                 }
 
+                // 2. gpAjax.ajaxPost
                 if (typeof gpAjax !== 'undefined' && gpAjax.ajaxPost) {
                     gpAjax.ajaxPost('town_info', 'trade', data, true,
                         res => {
@@ -481,8 +487,47 @@ class AutoSendResources extends MultUtil {
                     return;
                 }
 
-                resolve(false);
+                // 3. jQuery
+                if (typeof $ !== 'undefined' && $.ajax) {
+                    $.ajax({
+                        url: '/game/action/town_info/trade',
+                        method: 'POST',
+                        data: data,
+                        dataType: 'json',
+                        success: (res) => {
+                            clearTimeout(timer);
+                            resolve(res && !res.error);
+                        },
+                        error: () => {
+                            clearTimeout(timer);
+                            resolve(false);
+                        }
+                    });
+                    return;
+                }
+
+                // 4. XMLHttpRequest (fallback)
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/game/action/town_info/trade', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                xhr.onload = function() {
+                    clearTimeout(timer);
+                    try {
+                        const res = JSON.parse(xhr.responseText);
+                        resolve(res && !res.error);
+                    } catch(e) {
+                        resolve(false);
+                    }
+                };
+                xhr.onerror = function() {
+                    clearTimeout(timer);
+                    resolve(false);
+                };
+                xhr.send(new URLSearchParams(data));
+
             } catch(e) {
+                console.error('❌ Erro ao enviar:', e);
                 resolve(false);
             }
         });

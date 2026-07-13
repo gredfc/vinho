@@ -1,8 +1,10 @@
-// ============================================================
-// 📦 MÓDULO: AutoFarm - ModernBot Clone
-// ============================================================
+// ═══════════════════════════════════════════════════════════════════════
+// 📦 MÓDULO: AutoFarm (MODERNBOT CLONE) - COM VERIFICAÇÃO
+// ═══════════════════════════════════════════════════════════════════════
 
-class AutoFarm extends MultUtil {
+if (typeof AutoFarm === 'undefined') {
+    
+var AutoFarm = class extends MultUtil {
     constructor(c, s) {
         super(c, s);
 
@@ -25,6 +27,7 @@ class AutoFarm extends MultUtil {
         this.lastTime = Date.now();
         this.polis_list = [];
         this._claimInProgress = false;
+        this._settingsRendered = false;
 
         if (this.active) {
             this.active = setInterval(this.main.bind(this), 5000);
@@ -151,7 +154,6 @@ class AutoFarm extends MultUtil {
         this.$popup = this.createPopup(423, 320, 170, this.$content);
         this.dropdown_active = false;
 
-        // Open and close the dropdown with the mouse
         const close = () => {
             if (!this.dropdown_active) this.$popup.hide();
             this.dropdown_active = false;
@@ -182,21 +184,14 @@ class AutoFarm extends MultUtil {
             }
         });
 
-        // Update the dropdown UI
         this.updateDropdownUI();
     };
 
-    /* ============================================================
-       CREATE BUTTON
-       ============================================================ */
     createButton = (id, label, callback) => {
         return uw.$(`<button id="${id}" class="button_new" style="font-size:11px;padding:4px 10px;margin:2px;border-radius:4px;">${label}</button>`)
             .on('click', callback);
     };
 
-    /* ============================================================
-       UPDATE BUTTONS
-       ============================================================ */
     updateButtons = () => {
         this.$button5.removeClass('disabled');
         this.$button10.removeClass('disabled');
@@ -218,7 +213,6 @@ class AutoFarm extends MultUtil {
         if (this.gui) this.$guiOn.addClass('disabled');
         else this.$guiOff.addClass('disabled');
 
-        // Botões principais
         if (this.active) {
             this.$startBtn.text('▶ Rodando...');
             this.$startBtn.css('opacity', '0.6');
@@ -229,13 +223,9 @@ class AutoFarm extends MultUtil {
             this.$stopBtn.css('display', 'inline-block');
         }
 
-        // Atualiza dropdown
         this.updateDropdownUI();
     };
 
-    /* ============================================================
-       UPDATE DROPDOWN UI
-       ============================================================ */
     updateDropdownUI = () => {
         var statusText = this.$status.find('#af-status-text');
         if (statusText.length) {
@@ -265,7 +255,6 @@ class AutoFarm extends MultUtil {
             }
         }
 
-        // Atualiza o contador
         var isCaptainActive = false;
         try {
             isCaptainActive = $('.advisor_frame.captain div').hasClass('captain_active');
@@ -274,56 +263,41 @@ class AutoFarm extends MultUtil {
         this.$count.css('color', isCaptainActive ? "#1aff1a" : "yellow");
     };
 
-    /* ============================================================
-       TOGGLE DURATION
-       ============================================================ */
     toggleDuration = (event) => {
         const { id } = event.currentTarget;
-
         if (id == "modern_farm_5") this.timing = 300000;
         if (id == "modern_farm_10") this.timing = 600000;
         if (id == "modern_farm_20") this.timing = 1200000;
-
         this.storage.save('af_timing', this.timing);
         this.updateButtons();
         this.console.log('[AutoFarm] ⏱️ Intervalo: ' + (this.timing / 60000) + 'min');
         this.log('⏱️ Intervalo: ' + (this.timing / 60000) + 'min', 'info');
+        if (this._settingsRendered) this.renderSettings();
     };
 
-    /* ============================================================
-       TOGGLE STORAGE
-       ============================================================ */
     toggleStorage = (event) => {
         const { id } = event.currentTarget;
-
         if (id == "modern_farm_80") this.percent = 0.8;
         if (id == "modern_farm_90") this.percent = 0.9;
         if (id == "modern_farm_100") this.percent = 1;
-
         this.storage.save('af_percent', this.percent);
         this.updateButtons();
         this.console.log('[AutoFarm] 📊 Armazenamento: ' + (this.percent * 100) + '%');
         this.log('📊 Armazenamento: ' + (this.percent * 100) + '%', 'info');
+        if (this._settingsRendered) this.renderSettings();
     };
 
-    /* ============================================================
-       TOGGLE GUI
-       ============================================================ */
     toggleGui = (event) => {
         const { id } = event.currentTarget;
-
         if (id == "modern_farm_gui_on") this.gui = true;
         if (id == "modern_farm_gui_off") this.gui = false;
-
         this.storage.save('af_gui', this.gui);
         this.updateButtons();
         this.console.log('[AutoFarm] 🖥️ GUI Mode: ' + (this.gui ? 'ON' : 'OFF'));
         this.log('🖥️ GUI Mode: ' + (this.gui ? 'ON' : 'OFF'), 'info');
+        if (this._settingsRendered) this.renderSettings();
     };
 
-    /* ============================================================
-       TOGGLE
-       ============================================================ */
     toggle = () => {
         if (this.active) {
             clearInterval(this.active);
@@ -341,11 +315,9 @@ class AutoFarm extends MultUtil {
         }
         this.updateButtons();
         this.updateDropdownUI();
+        if (this._settingsRendered) this.renderSettings();
     };
 
-    /* ============================================================
-       GENERATE LIST - 1 polis per island
-       ============================================================ */
     generateList = () => {
         const islands_list = new Set();
         const polis_list = [];
@@ -371,9 +343,6 @@ class AutoFarm extends MultUtil {
         return polis_list;
     };
 
-    /* ============================================================
-       GET NEXT COLLECTION
-       ============================================================ */
     getNextCollection = () => {
         const collection = uw.MM.getOnlyCollectionByName('FarmTownPlayerRelation');
         const models = collection?.models ?? [];
@@ -398,9 +367,6 @@ class AutoFarm extends MultUtil {
         return seconds > 0 ? seconds * 1000 : 0;
     };
 
-    /* ============================================================
-       UPDATE TIMER
-       ============================================================ */
     updateTimer = () => {
         const currentTime = Date.now();
         this.timer -= currentTime - this.lastTime;
@@ -412,9 +378,6 @@ class AutoFarm extends MultUtil {
         this.updateDropdownUI();
     };
 
-    /* ============================================================
-       CLAIM - MAIN
-       ============================================================ */
     claim = async () => {
         if (this._claimInProgress) {
             this.console.log('[AutoFarm] ⏳ Coleta já em progresso...');
@@ -426,7 +389,6 @@ class AutoFarm extends MultUtil {
         this.polis_list = this.generateList();
 
         try {
-            // If the captain is active and NOT in GUI mode
             if (isCaptainActive && !this.gui) {
                 try {
                     await this.fakeOpening();
@@ -439,7 +401,6 @@ class AutoFarm extends MultUtil {
                         await this.claimMultiple(1200, 2400);
                     }
                     await this.fakeUpdate();
-
                     setTimeout(() => {
                         try { uw.WMap.removeFarmTownLootCooldownIconAndRefreshLootTimers(); } catch(e) {}
                     }, 2000);
@@ -450,7 +411,6 @@ class AutoFarm extends MultUtil {
                 }
             }
 
-            // If the captain is active and in GUI mode
             if (isCaptainActive && this.gui) {
                 try {
                     await this.fakeGuiUpdate();
@@ -461,7 +421,6 @@ class AutoFarm extends MultUtil {
                 }
             }
 
-            // Fallback: claim one by one
             await this.claimOneByOne();
             this._claimInProgress = false;
 
@@ -471,9 +430,6 @@ class AutoFarm extends MultUtil {
         }
     };
 
-    /* ============================================================
-       CLAIM ONE BY ONE
-       ============================================================ */
     claimOneByOne = async () => {
         let max = 60;
         const { models: player_relation_models } = uw.MM.getOnlyCollectionByName('FarmTownPlayerRelation');
@@ -507,9 +463,6 @@ class AutoFarm extends MultUtil {
         }, 2000);
     };
 
-    /* ============================================================
-       CLAIM SINGLE
-       ============================================================ */
     claimSingle = async (town_id, farm_town_id, relation_id, option = 1) => {
         const data = {
             model_url: `FarmTownPlayerRelation/${relation_id}`,
@@ -529,9 +482,6 @@ class AutoFarm extends MultUtil {
         }
     };
 
-    /* ============================================================
-       CLAIM MULTIPLE
-       ============================================================ */
     claimMultiple = async (base = 300, boost = 600) => {
         const data = {
             towns: this.polis_list,
@@ -549,9 +499,6 @@ class AutoFarm extends MultUtil {
         }
     };
 
-    /* ============================================================
-       FAKE OPENING
-       ============================================================ */
     fakeOpening = async () => {
         try {
             const town_id = uw.ITowns.getCurrentTown().id;
@@ -567,9 +514,6 @@ class AutoFarm extends MultUtil {
         }
     };
 
-    /* ============================================================
-       FAKE SELECT ALL
-       ============================================================ */
     fakeSelectAll = async () => {
         const data = {
             town_ids: this.polis_list,
@@ -584,9 +528,6 @@ class AutoFarm extends MultUtil {
         }
     };
 
-    /* ============================================================
-       FAKE UPDATE
-       ============================================================ */
     fakeUpdate = async () => {
         const town = uw.ITowns.getCurrentTown();
         const { attributes: booty } = town.getResearches();
@@ -609,36 +550,22 @@ class AutoFarm extends MultUtil {
         }
     };
 
-    /* ============================================================
-       FAKE GUI UPDATE
-       ============================================================ */
     fakeGuiUpdate = () =>
         new Promise(async (myResolve, myReject) => {
             try {
-                // Open the farm town overview
                 uw.$(".toolbar_button.premium .icon").trigger('mouseenter');
                 await this.sleep(1019.39, 127.54);
-
-                // Click on the farm town overview
                 uw.$(".farm_town_overview a").trigger('click');
                 await this.sleep(1156.65, 165.62);
-
-                // Select all the polis
                 uw.$(".checkbox.select_all").trigger("click");
                 await this.sleep(1036.20, 135.69);
-
-                // Claim the resources
                 uw.$("#fto_claim_button").trigger("click");
                 await this.sleep(1036.20, 135.69);
-
-                // Confirm the claim if needed
                 const el = uw.$(".confirmation .btn_confirm.button_new");
                 if (el.length) {
                     el.trigger("click");
                     await this.sleep(1036.20, 135.69);
                 }
-
-                // Close the window
                 uw.$(".icon_right.icon_type_speed.ui-dialog-titlebar-close").trigger("click");
                 myResolve();
             } catch (e) {
@@ -647,19 +574,9 @@ class AutoFarm extends MultUtil {
             }
         });
 
-    /* ============================================================
-       GET TOTAL RESOURCES
-       ============================================================ */
     getTotalResources = () => {
         const polis_list = this.generateList();
-
-        let total = {
-            wood: 0,
-            stone: 0,
-            iron: 0,
-            storage: 0,
-        };
-
+        let total = { wood: 0, stone: 0, iron: 0, storage: 0 };
         for (let town_id of polis_list) {
             const town = uw.ITowns.getTown(town_id);
             const { wood, stone, iron, storage } = town.resources();
@@ -668,13 +585,9 @@ class AutoFarm extends MultUtil {
             total.iron += iron;
             total.storage += storage;
         }
-
         return total;
     };
 
-    /* ============================================================
-       MAIN LOOP
-       ============================================================ */
     main = async () => {
         if (window.__multbot_captcha_active) return;
         try {
@@ -703,14 +616,10 @@ class AutoFarm extends MultUtil {
         }
     };
 
-    /* ============================================================
-       SLEEP
-       ============================================================ */
     sleep = (ms, stdDev) => {
         if (typeof stdDev === 'undefined') {
             return new Promise(resolve => setTimeout(resolve, ms));
         }
-
         const mean = ms;
         let u = 0, v = 0;
         while (u === 0) u = Math.random();
@@ -720,9 +629,6 @@ class AutoFarm extends MultUtil {
         return new Promise(resolve => setTimeout(resolve, num));
     };
 
-    /* ============================================================
-       LOG
-       ============================================================ */
     log = (message, type = 'info') => {
         const timestamp = new Date().toLocaleTimeString();
         const $log = this.$log;
@@ -733,25 +639,21 @@ class AutoFarm extends MultUtil {
                      type === 'warning' ? '#ffb74d' : '#64b5f6'
         });
         $log.prepend($entry);
-
         while ($log.children().length > 20) {
             $log.children().last().remove();
         }
     };
 
     /* ============================================================
-       SETTINGS - Para o painel do MultBot
+       SETTINGS PARA A ABA FARM
        ============================================================ */
     settings = () => {
-        return this.settingsHTML();
-    };
-
-    settingsHTML = () => {
-        // Força a atualização da UI
-        setTimeout(() => {
-            this.updateButtons();
-            this.updateDropdownUI();
-        }, 100);
+        this._settingsRendered = true;
+        var isActive = this.active;
+        var seconds = Math.max(0, Math.ceil(this.timer / 1000));
+        var mins = Math.floor(seconds / 60);
+        var secs = seconds % 60;
+        var timerStr = mins + 'm ' + secs + 's';
 
         return `
         <div class="game_border" style="margin-bottom:20px;">
@@ -770,17 +672,17 @@ class AutoFarm extends MultUtil {
                 <!-- Status -->
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #2a1f0e;margin-bottom:8px;">
                     <span style="color:#c8a86e;font-weight:bold;">📌 Estado:</span>
-                    <span id="af-status-text-settings" style="color:${this.active ? '#44ff88' : '#ff6b6b'};">${this.active ? '🟢 Executando' : '⏸️ Parado'}</span>
-                    <span id="af-timer-settings" style="color:#ffd700;font-family:monospace;">${this.formatTimer()}</span>
+                    <span id="af-status-text-settings" style="color:${isActive ? '#44ff88' : '#ff6b6b'};">${isActive ? '🟢 Executando' : '⏸️ Parado'}</span>
+                    <span style="color:#ffd700;font-family:monospace;">${timerStr}</span>
                 </div>
 
                 <!-- Intervalo -->
                 <div style="padding:5px 0;">
                     <span style="color:#d4a017;font-weight:bold;">⏱️ Intervalo:</span>
                     <div style="display:flex;gap:6px;padding:5px 0;flex-wrap:wrap;">
-                        <button class="button_new" id="af-btn-5min" style="font-size:11px;padding:3px 12px;${this.timing === 300000 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">5 min</button>
-                        <button class="button_new" id="af-btn-10min" style="font-size:11px;padding:3px 12px;${this.timing === 600000 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">10 min</button>
-                        <button class="button_new" id="af-btn-20min" style="font-size:11px;padding:3px 12px;${this.timing === 1200000 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">20 min</button>
+                        <button class="button_new af-btn-settings" data-value="300000" style="font-size:11px;padding:3px 12px;${this.timing === 300000 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">5 min</button>
+                        <button class="button_new af-btn-settings" data-value="600000" style="font-size:11px;padding:3px 12px;${this.timing === 600000 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">10 min</button>
+                        <button class="button_new af-btn-settings" data-value="1200000" style="font-size:11px;padding:3px 12px;${this.timing === 1200000 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">20 min</button>
                     </div>
                 </div>
 
@@ -788,9 +690,9 @@ class AutoFarm extends MultUtil {
                 <div style="padding:5px 0;">
                     <span style="color:#d4a017;font-weight:bold;">📊 Armazenamento:</span>
                     <div style="display:flex;gap:6px;padding:5px 0;flex-wrap:wrap;">
-                        <button class="button_new" id="af-btn-80" style="font-size:11px;padding:3px 12px;${this.percent === 0.8 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">80%</button>
-                        <button class="button_new" id="af-btn-90" style="font-size:11px;padding:3px 12px;${this.percent === 0.9 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">90%</button>
-                        <button class="button_new" id="af-btn-100" style="font-size:11px;padding:3px 12px;${this.percent === 1 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">100%</button>
+                        <button class="button_new af-btn-settings" data-value="0.8" style="font-size:11px;padding:3px 12px;${this.percent === 0.8 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">80%</button>
+                        <button class="button_new af-btn-settings" data-value="0.9" style="font-size:11px;padding:3px 12px;${this.percent === 0.9 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">90%</button>
+                        <button class="button_new af-btn-settings" data-value="1" style="font-size:11px;padding:3px 12px;${this.percent === 1 ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">100%</button>
                     </div>
                 </div>
 
@@ -798,17 +700,17 @@ class AutoFarm extends MultUtil {
                 <div style="padding:5px 0;">
                     <span style="color:#d4a017;font-weight:bold;">🖥️ Modo GUI:</span>
                     <div style="display:flex;gap:6px;padding:5px 0;flex-wrap:wrap;">
-                        <button class="button_new" id="af-btn-gui-on" style="font-size:11px;padding:3px 12px;${this.gui ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">ON</button>
-                        <button class="button_new" id="af-btn-gui-off" style="font-size:11px;padding:3px 12px;${!this.gui ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">OFF</button>
+                        <button class="button_new af-btn-settings" data-value="true" style="font-size:11px;padding:3px 12px;${this.gui ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">ON</button>
+                        <button class="button_new af-btn-settings" data-value="false" style="font-size:11px;padding:3px 12px;${!this.gui ? 'background:linear-gradient(135deg,#2d5a1e,#3d7a2e);border-color:#44ff88;color:#44ff88;' : ''}">OFF</button>
                     </div>
                 </div>
 
                 <!-- Botões Principais -->
                 <div style="display:flex;gap:6px;padding:10px 0;border-top:1px solid #2a1f0e;margin-top:5px;">
-                    <button class="button_new" id="af-btn-start" style="flex:1;background:linear-gradient(180deg,#4a7a3a,#2d5a1d);border-color:#6a9a5a;color:#fff;font-weight:bold;padding:8px 12px;">
-                        ${this.active ? '🔄 Executando...' : '▶️ Iniciar Farm'}
+                    <button class="button_new" id="af-btn-start-settings" style="flex:1;background:linear-gradient(180deg,#4a7a3a,#2d5a1d);border-color:#6a9a5a;color:#fff;font-weight:bold;padding:8px 12px;">
+                        ${isActive ? '🔄 Executando...' : '▶️ Iniciar Farm'}
                     </button>
-                    <button class="button_new" id="af-btn-stop" style="flex:1;background:linear-gradient(180deg,#7a3a3a,#5a2a2a);border-color:#9a5a5a;color:#fff;font-weight:bold;padding:8px 12px;">
+                    <button class="button_new" id="af-btn-stop-settings" style="flex:1;background:linear-gradient(180deg,#7a3a3a,#5a2a2a);border-color:#9a5a5a;color:#fff;font-weight:bold;padding:8px 12px;">
                         ⏹️ Parar
                     </button>
                 </div>
@@ -829,90 +731,53 @@ class AutoFarm extends MultUtil {
     };
 
     /* ============================================================
-       FORMAT TIMER
+       RENDER SETTINGS - Recarrega o painel
        ============================================================ */
-    formatTimer = () => {
-        var seconds = Math.max(0, Math.ceil(this.timer / 1000));
-        var mins = Math.floor(seconds / 60);
-        var secs = seconds % 60;
-        return mins + 'm ' + secs + 's';
+    renderSettings = () => {
+        var container = document.getElementById('af-settings-container');
+        if (container) {
+            container.innerHTML = this.settings();
+            this.bindSettingsEvents();
+        }
     };
 
     /* ============================================================
-       BIND EVENTS - Chamado depois do settings ser renderizado
+       BIND SETTINGS EVENTS
        ============================================================ */
-    bindEvents = () => {
+    bindSettingsEvents = () => {
         var self = this;
 
-        // Intervalo
-        document.getElementById('af-btn-5min')?.addEventListener('click', function() {
-            self.timing = 300000;
-            self.storage.save('af_timing', self.timing);
-            self.updateButtons();
-            self.console.log('[AutoFarm] ⏱️ Intervalo: 5min');
-            self.renderSettings();
+        // Botões de configuração
+        document.querySelectorAll('.af-btn-settings').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var value = this.getAttribute('data-value');
+                var text = this.textContent.trim();
+
+                if (text.includes('min')) {
+                    self.timing = parseInt(value);
+                    self.storage.save('af_timing', self.timing);
+                    self.console.log('[AutoFarm] ⏱️ Intervalo: ' + (self.timing / 60000) + 'min');
+                    self.log('⏱️ Intervalo: ' + (self.timing / 60000) + 'min', 'info');
+                } else if (text.includes('%')) {
+                    self.percent = parseFloat(value);
+                    self.storage.save('af_percent', self.percent);
+                    self.console.log('[AutoFarm] 📊 Armazenamento: ' + (self.percent * 100) + '%');
+                    self.log('📊 Armazenamento: ' + (self.percent * 100) + '%', 'info');
+                } else if (text === 'ON' || text === 'OFF') {
+                    self.gui = value === 'true';
+                    self.storage.save('af_gui', self.gui);
+                    self.console.log('[AutoFarm] 🖥️ GUI Mode: ' + (self.gui ? 'ON' : 'OFF'));
+                    self.log('🖥️ GUI Mode: ' + (self.gui ? 'ON' : 'OFF'), 'info');
+                }
+                self.updateButtons();
+                self.renderSettings();
+            });
         });
 
-        document.getElementById('af-btn-10min')?.addEventListener('click', function() {
-            self.timing = 600000;
-            self.storage.save('af_timing', self.timing);
-            self.updateButtons();
-            self.console.log('[AutoFarm] ⏱️ Intervalo: 10min');
-            self.renderSettings();
-        });
-
-        document.getElementById('af-btn-20min')?.addEventListener('click', function() {
-            self.timing = 1200000;
-            self.storage.save('af_timing', self.timing);
-            self.updateButtons();
-            self.console.log('[AutoFarm] ⏱️ Intervalo: 20min');
-            self.renderSettings();
-        });
-
-        // Armazenamento
-        document.getElementById('af-btn-80')?.addEventListener('click', function() {
-            self.percent = 0.8;
-            self.storage.save('af_percent', self.percent);
-            self.updateButtons();
-            self.console.log('[AutoFarm] 📊 Armazenamento: 80%');
-            self.renderSettings();
-        });
-
-        document.getElementById('af-btn-90')?.addEventListener('click', function() {
-            self.percent = 0.9;
-            self.storage.save('af_percent', self.percent);
-            self.updateButtons();
-            self.console.log('[AutoFarm] 📊 Armazenamento: 90%');
-            self.renderSettings();
-        });
-
-        document.getElementById('af-btn-100')?.addEventListener('click', function() {
-            self.percent = 1;
-            self.storage.save('af_percent', self.percent);
-            self.updateButtons();
-            self.console.log('[AutoFarm] 📊 Armazenamento: 100%');
-            self.renderSettings();
-        });
-
-        // GUI
-        document.getElementById('af-btn-gui-on')?.addEventListener('click', function() {
-            self.gui = true;
-            self.storage.save('af_gui', self.gui);
-            self.updateButtons();
-            self.console.log('[AutoFarm] 🖥️ GUI: ON');
-            self.renderSettings();
-        });
-
-        document.getElementById('af-btn-gui-off')?.addEventListener('click', function() {
-            self.gui = false;
-            self.storage.save('af_gui', self.gui);
-            self.updateButtons();
-            self.console.log('[AutoFarm] 🖥️ GUI: OFF');
-            self.renderSettings();
-        });
-
-        // Start / Stop
-        document.getElementById('af-btn-start')?.addEventListener('click', function() {
+        // Botão Iniciar
+        document.getElementById('af-btn-start-settings')?.addEventListener('click', function(e) {
+            e.preventDefault();
             if (self.active) {
                 clearInterval(self.active);
                 self.active = null;
@@ -930,7 +795,9 @@ class AutoFarm extends MultUtil {
             self.renderSettings();
         });
 
-        document.getElementById('af-btn-stop')?.addEventListener('click', function() {
+        // Botão Parar
+        document.getElementById('af-btn-stop-settings')?.addEventListener('click', function(e) {
+            e.preventDefault();
             if (self.active) {
                 clearInterval(self.active);
                 self.active = null;
@@ -942,17 +809,10 @@ class AutoFarm extends MultUtil {
             }
         });
     };
-
-    /* ============================================================
-       RENDER SETTINGS - Recarrega o painel
-       ============================================================ */
-    renderSettings = () => {
-        // Atualiza o conteúdo no painel do MultBot
-        var container = document.getElementById('af-settings-container');
-        if (container) {
-            container.innerHTML = this.settingsHTML();
-            this.bindEvents();
-        }
-    };
 }
 
+console.log('[MultBot] ✅ AutoFarm registado');
+
+} else {
+    console.log('[MultBot] ⚠️ AutoFarm já existe, a usar o existente');
+}

@@ -1,469 +1,832 @@
-class AutoFarm extends MultUtil {
-    constructor(c, s) {
-        super(c, s);
+// ============================================================
+// 📦 MÓDULO: Autofarm (ModernBot Clone - ADAPTADO)
+// ============================================================
 
-        // Load the settings
-        this.timing = this.storage.load('af_level', 300000);
-        this.percent = this.storage.load('af_percent', 1);
-        this.active = this.storage.load('af_active', false);
-        this.gui = this.storage.load('af_gui', false);
+var Autofarm = {
+    settings: {
+        timing: 300000,  // 5 minutos
+        percent: 1,      // 100%
+        active: false,
+        gui: false
+    },
+    timer: 0,
+    lastTime: 0,
+    intervalId: null,
+    polis_list: [],
+    isRunning: false,
+    farmButton: null,
 
-        // Create the elements for the new menu
-        const { $activity, $count } = this.createActivity("url(https://gpit.innogamescdn.com/images/game/premium_features/feature_icons_2.08.png) no-repeat 0 -240px");
-        this.$activity = $activity
-        this.$count = $count
-        this.$activity.on('click', this.toggle)
-
-        this.createDropdown();
-        this.updateButtons();
-
-        this.timer = 0;
+    // ========================================
+    // INIT
+    // ========================================
+    init: function() {
+        ConsoleLog.Log('🌾 AutoFarm (ModernBot) inicializado', 1);
+        this.loadSettings();
         this.lastTime = Date.now();
-        if (this.active) this.active = setInterval(this.main, 5000);
-    }
-
-    /* Create the dropdown menu */
-    createDropdown = () => {
-        this.$content = uw.$("<div></div>")
-        this.$title = uw.$("<p>Modern Farm</p>").css({ "text-align": "center", "margin": "2px", "font-weight": "bold", "font-size": "16px" })
-        this.$content.append(this.$title)
-
-        this.$duration = uw.$("<p>Duration:</p>").css({ "text-align": "left", "margin": "2px", "font-weight": "bold" })
-        this.$button5 = this.createButton("modern_farm_5", "5 min", this.toggleDuration)
-        this.$button10 = this.createButton("modern_farm_10", "10 min", this.toggleDuration)
-        this.$button20 = this.createButton("modern_farm_20", "20 min", this.toggleDuration)
-        this.$content.append(this.$duration, this.$button5, this.$button10, this.$button20)
-
-        this.$storage = uw.$("<p>Storage:</p>").css({ "text-align": "left", "margin": "2px", "font-weight": "bold" })
-        this.$button80 = this.createButton("modern_farm_80", "80%", this.toggleStorage).css({ "width": "70px" })
-        this.$button90 = this.createButton("modern_farm_90", "90%", this.toggleStorage).css({ "width": "80px" })
-        this.$button100 = this.createButton("modern_farm_100", "100%", this.toggleStorage).css({ "width": "80px" })
-        this.$content.append(this.$storage, this.$button80, this.$button90, this.$button100)
-
-        this.$gui = uw.$("<p>Gui:</p>").css({ "text-align": "left", "margin": "2px", "font-weight": "bold" })
-        this.$guiOn = this.createButton("modern_farm_gui_on", "ON", this.toggleGui)
-        this.$guiOff = this.createButton("modern_farm_gui_off", "OFF", this.toggleGui)
-        this.$content.append(this.$gui, this.$guiOn, this.$guiOff)
-
-        this.$popup = this.createPopup(423, 250, 170, this.$content)
-        this.dropdown_active = false
-
-        // Open and close the dropdown with the mouse
-        const close = () => {
-            if (!this.dropdown_active) this.$popup.hide()
-            this.dropdown_active = false
+        
+        // Se estava ativo, reinicia
+        if (this.settings.active) {
+            this.startFarm();
         }
+    },
 
-        const open = () => {
-            if (this.dropdown_active) this.$popup.show()
-        }
-
-        this.$activity.on({
-            mouseenter: () => {
-                this.dropdown_active = true
-                setTimeout(open, 1000)
-            },
-            mouseleave: () => {
-                this.dropdown_active = false
-                setTimeout(close, 50)
+    // ========================================
+    // LOAD SETTINGS
+    // ========================================
+    loadSettings: function() {
+        try {
+            var saved = localStorage.getItem('AutoFarm.Settings');
+            if (saved) {
+                var parsed = JSON.parse(saved);
+                $.extend(this.settings, parsed);
             }
-        })
+        } catch(e) {}
+    },
 
-        this.$popup.on({
-            mouseenter: () => {
-                this.dropdown_active = true
-            },
-            mouseleave: () => {
-                this.dropdown_active = false
-                setTimeout(close, 50)
+    saveSettings: function() {
+        try {
+            localStorage.setItem('AutoFarm.Settings', JSON.stringify(this.settings));
+        } catch(e) {}
+    },
+
+    // ========================================
+    // GENERATE LIST - 1 cidade por ilha
+    // ========================================
+    generateList: function() {
+        var islands_list = new Set();
+        var polis_list = [];
+        var minResource = 0;
+        var min_percent = 0;
+
+        try {
+            var towns = MM.getOnlyCollectionByName('Town').models;
+
+            for (var i = 0; i < towns.length; i++) {
+                var town = towns[i];
+                var attrs = town.attributes;
+                if (attrs.on_small_island || islands_list.has(attrs.island_id)) continue;
+
+                // Verifica percentual mínimo
+                var resources = ITowns.getTown(attrs.id).resources();
+                minResource = Math.min(resources.wood, resources.stone, resources.iron);
+                min_percent = resources.storage > 0 ? minResource / resources.storage : 0;
+
+                if (min_percent < this.settings.percent) continue;
+
+                islands_list.add(attrs.island_id);
+                polis_list.push(attrs.id);
             }
-        })
-    }
-
-    /* Update the buttons */
-    updateButtons = () => {
-        this.$button5.addClass('disabled')
-        this.$button10.addClass('disabled')
-        this.$button20.addClass('disabled')
-        this.$button80.addClass('disabled')
-        this.$button90.addClass('disabled')
-        this.$button100.addClass('disabled')
-
-        if (this.timing == 300000) this.$button5.removeClass('disabled')
-        if (this.timing == 600000) this.$button10.removeClass('disabled')
-        if (this.timing == 1200000) this.$button20.removeClass('disabled')
-
-        if (this.percent == 0.8) this.$button80.removeClass('disabled')
-        if (this.percent == 0.9) this.$button90.removeClass('disabled')
-        if (this.percent == 1) this.$button100.removeClass('disabled')
-
-        if (!this.active) {
-            this.$count.css('color', "red")
-            this.$count.text("")
-        }
-
-        this.$guiOn.addClass('disabled')
-        this.$guiOff.addClass('disabled')
-        if (this.gui) this.$guiOn.removeClass('disabled')
-        else this.$guiOff.removeClass('disabled')
-    }
-
-    toggleDuration = (event) => {
-        const { id } = event.currentTarget
-
-        // Update the timer
-        if (id == "modern_farm_5") this.timing = 300_000
-        if (id == "modern_farm_10") this.timing = 600_000
-        if (id == "modern_farm_20") this.timing = 1_200_000
-
-        // Save the settings and update the buttons
-        this.storage.save('af_level', this.timing);
-        this.updateButtons()
-    }
-
-    toggleStorage = (event) => {
-        const { id } = event.currentTarget
-
-        // Update the percent
-        if (id == "modern_farm_80") this.percent = 0.8
-        if (id == "modern_farm_90") this.percent = 0.9
-        if (id == "modern_farm_100") this.percent = 1
-
-        // Save the settings and update the buttons
-        this.storage.save('af_percent', this.percent);
-        this.updateButtons()
-    }
-
-
-    toggleGui = (event) => {
-        const { id } = event.currentTarget
-
-        // Update the gui
-        if (id == "modern_farm_gui_on") this.gui = true
-        if (id == "modern_farm_gui_off") this.gui = false
-
-        // Save the settings and update the buttons
-        this.storage.save('af_gui', this.gui);
-        this.updateButtons()
-    }
-
-    /* generate the list containing 1 polis per island */
-    generateList = () => {
-        const islands_list = new Set();
-        const polis_list = [];
-        let minResource = 0;
-        let min_percent = 0;
-
-        const { models: towns } = uw.MM.getOnlyCollectionByName('Town');
-
-        for (const town of towns) {
-            const { on_small_island, island_id, id } = town.attributes;
-            if (on_small_island || islands_list.has(island_id)) continue;
-
-            // Check the min percent for each town
-            const { wood, stone, iron, storage } = uw.ITowns.getTown(id).resources();
-            minResource = Math.min(wood, stone, iron);
-            min_percent = storage > 0 ? minResource / storage : 0;
-
-            if (min_percent < this.percent) continue;
-
-            islands_list.add(island_id);
-            polis_list.push(town.id);
+        } catch(e) {
+            ConsoleLog.Log('⚠️ Erro ao gerar lista: ' + e.message, 1);
         }
 
         return polis_list;
-    };
+    },
 
-    toggle = () => {
-        if (this.active) {
-            clearInterval(this.active);
-            this.active = null;
-            this.updateButtons();
+    // ========================================
+    // GET NEXT COLLECTION
+    // ========================================
+    getNextCollection: function() {
+        try {
+            var collection = MM.getOnlyCollectionByName('FarmTownPlayerRelation');
+            var models = collection?.models ?? [];
+            if (models.length === 0) return 0;
+
+            var lootCounts = {};
+            for (var i = 0; i < models.length; i++) {
+                var lootable_at = models[i].attributes.lootable_at;
+                lootCounts[lootable_at] = (lootCounts[lootable_at] || 0) + 1;
+            }
+
+            var maxLootableTime = 0;
+            var maxValue = 0;
+            for (var time in lootCounts) {
+                var value = lootCounts[time];
+                if (value < maxValue) continue;
+                maxLootableTime = parseInt(time);
+                maxValue = value;
+            }
+
+            var seconds = maxLootableTime - Math.floor(Date.now() / 1000);
+            return seconds > 0 ? seconds * 1000 : 0;
+        } catch(e) {
+            return 0;
         }
-        else {
-            this.updateTimer();
-            this.active = setInterval(this.main, 5000);
-        }
+    },
 
-        // Save the settings
-        this.storage.save('af_active', !!this.active);
-    };
-
-    /* return the time before the next collection */
-    getNextCollection = () => {
-        const collection = uw.MM.getOnlyCollectionByName('FarmTownPlayerRelation');
-        const models = collection?.models ?? [];
-        if (models.length === 0) return 0;
-
-        const lootCounts = {};
-        for (const model of models) {
-            const { lootable_at } = model.attributes;
-            lootCounts[lootable_at] = (lootCounts[lootable_at] || 0) + 1;
-        }
-
-        let maxLootableTime = 0;
-        let maxValue = 0;
-        for (const lootableTime in lootCounts) {
-            const value = lootCounts[lootableTime];
-            if (value < maxValue) continue;
-            maxLootableTime = lootableTime;
-            maxValue = value;
-        }
-
-        const seconds = maxLootableTime - Math.floor(Date.now() / 1000);
-        return seconds > 0 ? seconds * 1000 : 0;
-    };
-
-    /* Call to update the timer */
-    updateTimer = () => {
-        const currentTime = Date.now();
+    // ========================================
+    // UPDATE TIMER
+    // ========================================
+    updateTimer: function() {
+        var currentTime = Date.now();
         this.timer -= currentTime - this.lastTime;
         this.lastTime = currentTime;
 
-        // Update the count
-        const isCaptainActive = uw.GameDataPremium.isAdvisorActivated('captain');
-        this.$count.text(Math.round(Math.max(this.timer, 0) / 1000));
-        this.$count.css('color', isCaptainActive ? "#1aff1a" : "yellow");
-    };
+        var displayTime = Math.max(0, Math.ceil(this.timer / 1000));
+        var isCaptainActive = false;
+        try {
+            isCaptainActive = $('.advisor_frame.captain div').hasClass('captain_active');
+        } catch(e) {}
 
-    claim = async () => {
-        const isCaptainActive = uw.GameDataPremium.isAdvisorActivated('captain');
-        const polis_list = this.generateList();
-
-        // If the captain is active, claim all the resources at once and fake the opening
-        if (isCaptainActive && !this.gui) {
-            try {
-                await this.fakeOpening();
-                await this.sleep(Math.random() * 2000 + 1000);
-                await this.fakeSelectAll();
-                await this.sleep(Math.random() * 2000 + 1000);
-                if (this.timing <= 600_000) await this.claimMultiple(300, 600);
-                if (this.timing > 600_000) await this.claimMultiple(1200, 2400);
-                await this.fakeUpdate();
-
-                setTimeout(() => uw.WMap.removeFarmTownLootCooldownIconAndRefreshLootTimers(), 2000);
-                return;
-            } catch (e) {
-                this.console.log('[AutoFarm] Caminho do Captain falhou (' + (e?.message ?? e) + '), usando coleta individual como alternativa.');
+        // Atualiza o botão
+        if (this.farmButton) {
+            if (this.settings.active) {
+                var mins = Math.floor(displayTime / 60);
+                var secs = displayTime % 60;
+                this.farmButton.text('🔄 ' + mins + 'm ' + secs + 's');
+                this.farmButton.addClass('running');
+            } else {
+                this.farmButton.text('▶️ Iniciar Farm');
+                this.farmButton.removeClass('running');
             }
         }
 
-        if (isCaptainActive && this.gui) {
-            try {
-                await this.fakeGuiUpdate();
-                return;
-            } catch (e) {
-                this.console.log('[AutoFarm] Caminho do Captain (GUI) falhou (' + (e?.message ?? e) + '), usando coleta individual como alternativa.');
+        // Atualiza status
+        var status = document.getElementById('farm-status');
+        if (status) {
+            if (this.settings.active) {
+                status.textContent = '🟢 Executando (' + Math.floor(displayTime/60) + 'm ' + (displayTime%60) + 's)';
+                status.style.color = '#44ff88';
+            } else {
+                status.textContent = '⏸️ Parado';
+                status.style.color = '#ff6b6b';
             }
         }
+    },
 
-        // If the captain is not active (or the captain path failed above), claim the resources one by one
-        await this._claimOneByOne(polis_list);
-    };
+    // ========================================
+    // CLAIM
+    // ========================================
+    claim: function() {
+        return new Promise(async (resolve) => {
+            try {
+                var isCaptainActive = false;
+                try {
+                    isCaptainActive = $('.advisor_frame.captain div').hasClass('captain_active');
+                } catch(e) {}
 
-    /* Coleta cidade a cidade, respeitando o limite de 60 por ciclo */
-    _claimOneByOne = async (polis_list) => {
-        let max = 60;
-        const { models: player_relation_models } = uw.MM.getOnlyCollectionByName('FarmTownPlayerRelation');
-        const { models: farm_town_models } = uw.MM.getOnlyCollectionByName('FarmTown');
-        const now = Math.floor(Date.now() / 1000);
-        
-        for (let town_id of polis_list) {
-            let town = uw.ITowns.towns[town_id];
-            let x = town.getIslandCoordinateX();
-            let y = town.getIslandCoordinateY();
+                this.polis_list = this.generateList();
 
-            for (let farm_town of farm_town_models) {
-                if (farm_town.attributes.island_x != x) continue;
-                if (farm_town.attributes.island_y != y) continue;
+                // Se capitão ativo e NÃO está em modo GUI
+                if (isCaptainActive && !this.settings.gui) {
+                    try {
+                        await this.fakeOpening();
+                        await this.sleep(Math.random() * 2000 + 1000);
+                        await this.fakeSelectAll();
+                        await this.sleep(Math.random() * 2000 + 1000);
+                        if (this.settings.timing <= 600000) {
+                            await this.claimMultiple(300, 600);
+                        } else {
+                            await this.claimMultiple(1200, 2400);
+                        }
+                        await this.fakeUpdate();
+                        setTimeout(function() {
+                            try { WMap.removeFarmTownLootCooldownIconAndRefreshLootTimers(); } catch(e) {}
+                        }, 2000);
+                        resolve();
+                        return;
+                    } catch(e) {
+                        ConsoleLog.Log('[AutoFarm] Captain falhou: ' + e.message, 1);
+                    }
+                }
 
-                for (let relation of player_relation_models) {
-                    if (farm_town.attributes.id != relation.attributes.farm_town_id) continue;
-                    if (relation.attributes.relation_status !== 1) continue;
-                    if (relation.attributes.lootable_at !== null && now < relation.attributes.lootable_at) continue;
+                // Se capitão ativo E modo GUI
+                if (isCaptainActive && this.settings.gui) {
+                    try {
+                        await this.fakeGuiUpdate();
+                        resolve();
+                        return;
+                    } catch(e) {
+                        ConsoleLog.Log('[AutoFarm] Captain GUI falhou: ' + e.message, 1);
+                    }
+                }
 
-                    await this.claimSingle(town_id, relation.attributes.farm_town_id, relation.id, Math.ceil(this.timing / 600_000));
-                    await this.sleep(500);
-                    if (!max) return;
-                    else max -= 1;
+                // Modo normal (sem capitão)
+                await this.claimOneByOne();
+                resolve();
+
+            } catch(e) {
+                ConsoleLog.Log('[AutoFarm] Erro no claim: ' + e.message, 1);
+                resolve();
+            }
+        });
+    },
+
+    // ========================================
+    // CLAIM ONE BY ONE
+    // ========================================
+    claimOneByOne: function() {
+        return new Promise(async (resolve) => {
+            try {
+                var max = 60;
+                var player_relation_models = MM.getOnlyCollectionByName('FarmTownPlayerRelation').models;
+                var farm_town_models = MM.getOnlyCollectionByName('FarmTown').models;
+                var now = Math.floor(Date.now() / 1000);
+
+                for (var i = 0; i < this.polis_list.length; i++) {
+                    var town_id = this.polis_list[i];
+                    var town = ITowns.towns[town_id];
+                    var x = town.getIslandCoordinateX();
+                    var y = town.getIslandCoordinateY();
+
+                    for (var j = 0; j < farm_town_models.length; j++) {
+                        var farm_town = farm_town_models[j];
+                        if (farm_town.attributes.island_x != x) continue;
+                        if (farm_town.attributes.island_y != y) continue;
+
+                        for (var k = 0; k < player_relation_models.length; k++) {
+                            var relation = player_relation_models[k];
+                            if (farm_town.attributes.id != relation.attributes.farm_town_id) continue;
+                            if (relation.attributes.relation_status !== 1) continue;
+                            if (relation.attributes.lootable_at !== null && now < relation.attributes.lootable_at) continue;
+
+                            await this.claimSingle(town_id, relation.attributes.farm_town_id, relation.id, Math.ceil(this.settings.timing / 600000));
+                            await this.sleep(500);
+                            if (!max) { resolve(); return; }
+                            max -= 1;
+                        }
+                    }
+                }
+
+                setTimeout(function() {
+                    try { WMap.removeFarmTownLootCooldownIconAndRefreshLootTimers(); } catch(e) {}
+                }, 2000);
+                resolve();
+            } catch(e) {
+                resolve();
+            }
+        });
+    },
+
+    // ========================================
+    // CLAIM SINGLE
+    // ========================================
+    claimSingle: function(town_id, farm_town_id, relation_id, option) {
+        return new Promise((resolve) => {
+            try {
+                var data = {
+                    model_url: 'FarmTownPlayerRelation/' + relation_id,
+                    action_name: 'claim',
+                    arguments: {
+                        farm_town_id: farm_town_id,
+                        type: 'resources',
+                        option: option || 1
+                    },
+                    town_id: town_id,
+                    nl_init: true
+                };
+                
+                if (Game && Game.csrfToken) {
+                    data.token = Game.csrfToken;
+                }
+
+                var timer = setTimeout(function() { resolve(); }, 10000);
+
+                if (typeof gpAjax !== 'undefined' && gpAjax.ajaxPost) {
+                    gpAjax.ajaxPost('frontend_bridge', 'execute', data, true,
+                        function() { clearTimeout(timer); resolve(); },
+                        function() { clearTimeout(timer); resolve(); }
+                    );
+                } else if (typeof GPAjax !== 'undefined' && GPAjax.ajaxPost) {
+                    GPAjax.ajaxPost('frontend_bridge', 'execute', data, true,
+                        function() { clearTimeout(timer); resolve(); },
+                        function() { clearTimeout(timer); resolve(); }
+                    );
+                } else if (typeof $ !== 'undefined') {
+                    $.ajax({
+                        url: '/game/frontend_bridge?action=execute',
+                        method: 'POST',
+                        data: { json: JSON.stringify(data) },
+                        dataType: 'json',
+                        complete: function() { clearTimeout(timer); resolve(); }
+                    });
+                } else {
+                    clearTimeout(timer);
+                    resolve();
+                }
+            } catch(e) {
+                resolve();
+            }
+        });
+    },
+
+    // ========================================
+    // CLAIM MULTIPLE
+    // ========================================
+    claimMultiple: function(base, boost) {
+        return new Promise((resolve) => {
+            try {
+                var data = {
+                    towns: this.polis_list,
+                    time_option_base: base,
+                    time_option_booty: boost,
+                    claim_factor: 'normal',
+                    town_id: Game.townId,
+                    nl_init: true
+                };
+
+                var timer = setTimeout(function() { resolve(); }, 30000);
+
+                if (typeof gpAjax !== 'undefined' && gpAjax.ajaxPost) {
+                    gpAjax.ajaxPost('farm_town_overviews', 'claim_loads_multiple', data, true,
+                        function() { clearTimeout(timer); resolve(); },
+                        function() { clearTimeout(timer); resolve(); }
+                    );
+                } else if (typeof GPAjax !== 'undefined' && GPAjax.ajaxPost) {
+                    GPAjax.ajaxPost('farm_town_overviews', 'claim_loads_multiple', data, true,
+                        function() { clearTimeout(timer); resolve(); },
+                        function() { clearTimeout(timer); resolve(); }
+                    );
+                } else {
+                    clearTimeout(timer);
+                    resolve();
+                }
+            } catch(e) {
+                resolve();
+            }
+        });
+    },
+
+    // ========================================
+    // FAKE OPENING
+    // ========================================
+    fakeOpening: function() {
+        return new Promise((resolve) => {
+            try {
+                var data = {
+                    town_id: Game.townId,
+                    nl_init: true
+                };
+                if (typeof gpAjax !== 'undefined' && gpAjax.ajaxGet) {
+                    gpAjax.ajaxGet('farm_town_overviews', 'index', data, true, function() {
+                        setTimeout(function() {
+                            resolve();
+                        }, 10);
+                    });
+                } else {
+                    resolve();
+                }
+            } catch(e) {
+                resolve();
+            }
+        });
+    },
+
+    // ========================================
+    // FAKE SELECT ALL
+    // ========================================
+    fakeSelectAll: function() {
+        return new Promise((resolve) => {
+            try {
+                var data = {
+                    town_ids: this.polis_list,
+                    town_id: Game.townId,
+                    nl_init: true
+                };
+                if (typeof gpAjax !== 'undefined' && gpAjax.ajaxGet) {
+                    gpAjax.ajaxGet('farm_town_overviews', 'get_farm_towns_from_multiple_towns', data, true,
+                        function() { resolve(); },
+                        function() { resolve(); }
+                    );
+                } else {
+                    resolve();
+                }
+            } catch(e) {
+                resolve();
+            }
+        });
+    },
+
+    // ========================================
+    // FAKE UPDATE
+    // ========================================
+    fakeUpdate: function() {
+        return new Promise((resolve) => {
+            try {
+                var town = ITowns.getCurrentTown();
+                var booty = town.getResearches().attributes;
+                var trade_office = town.getBuildings().attributes;
+                var data = {
+                    island_x: town.getIslandCoordinateX(),
+                    island_y: town.getIslandCoordinateY(),
+                    current_town_id: town.id,
+                    booty_researched: booty.booty ? 1 : 0,
+                    diplomacy_researched: '',
+                    trade_office: trade_office.trade_office ? 1 : 0,
+                    town_id: town.id,
+                    nl_init: true
+                };
+                if (typeof gpAjax !== 'undefined' && gpAjax.ajaxGet) {
+                    gpAjax.ajaxGet('farm_town_overviews', 'get_farm_towns_for_town', data, true,
+                        function() { resolve(); },
+                        function() { resolve(); }
+                    );
+                } else {
+                    resolve();
+                }
+            } catch(e) {
+                resolve();
+            }
+        });
+    },
+
+    // ========================================
+    // FAKE GUI UPDATE
+    // ========================================
+    fakeGuiUpdate: function() {
+        return new Promise((resolve) => {
+            try {
+                // Abre o overview de farm
+                $(".toolbar_button.premium .icon").trigger('mouseenter');
+                setTimeout(function() {
+                    $(".farm_town_overview a").trigger('click');
+                    setTimeout(function() {
+                        $(".checkbox.select_all").trigger("click");
+                        setTimeout(function() {
+                            $("#fto_claim_button").trigger("click");
+                            setTimeout(function() {
+                                var el = $(".confirmation .btn_confirm.button_new");
+                                if (el.length) {
+                                    el.trigger("click");
+                                }
+                                setTimeout(function() {
+                                    $(".icon_right.icon_type_speed.ui-dialog-titlebar-close").trigger("click");
+                                    resolve();
+                                }, 2000);
+                            }, 1500);
+                        }, 1500);
+                    }, 1500);
+                }, 1500);
+            } catch(e) {
+                resolve();
+            }
+        });
+    },
+
+    // ========================================
+    // SLEEP
+    // ========================================
+    sleep: function(ms, stdDev) {
+        return new Promise((resolve) => {
+            if (typeof stdDev === 'undefined') {
+                setTimeout(resolve, ms);
+                return;
+            }
+            var u = 0, v = 0;
+            while (u === 0) u = Math.random();
+            while (v === 0) v = Math.random();
+            var num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            num = num * stdDev + ms;
+            setTimeout(resolve, num);
+        });
+    },
+
+    // ========================================
+    // MAIN - Loop principal
+    // ========================================
+    main: function() {
+        var self = this;
+        (async function() {
+            try {
+                var next_collection = self.getNextCollection();
+                if (next_collection && (self.timer > next_collection + 60000 || self.timer < next_collection)) {
+                    self.timer = next_collection + Math.floor(Math.random() * 20000) + 10000;
+                }
+
+                if (self.timer < 1) {
+                    self.polis_list = self.generateList();
+                    if (self.intervalId) {
+                        clearInterval(self.intervalId);
+                        self.intervalId = null;
+                    }
+
+                    await self.claim();
+
+                    var rand = Math.floor(Math.random() * 20000) + 10000;
+                    self.timer = self.settings.timing + rand;
+                    if (self.timer < next_collection) {
+                        self.timer = next_collection + rand;
+                    }
+
+                    self.startInterval();
+                }
+
+                self.updateTimer();
+            } catch(e) {
+                ConsoleLog.Log('[AutoFarm] Erro no main: ' + e.message, 1);
+                if (!self.intervalId) {
+                    self.startInterval();
                 }
             }
+        })();
+    },
+
+    // ========================================
+    // START INTERVAL
+    // ========================================
+    startInterval: function() {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
         }
-
-        setTimeout(() => uw.WMap.removeFarmTownLootCooldownIconAndRefreshLootTimers(), 2000);
-    };
-
-    /* Return the total resources of the polis in the list */
-    getTotalResources = () => {
-        const polis_list = this.generateList();
-
-        let total = {
-            wood: 0,
-            stone: 0,
-            iron: 0,
-            storage: 0,
-        };
-
-        for (let town_id of polis_list) {
-            const town = uw.ITowns.getTown(town_id);
-            const { wood, stone, iron, storage } = town.resources();
-            total.wood += wood;
-            total.stone += stone;
-            total.iron += iron;
-            total.storage += storage;
+        if (this.settings.active) {
+            this.intervalId = setInterval(this.main.bind(this), 1000);
         }
+    },
 
-        return total;
-    };
+    // ========================================
+    // START FARM
+    // ========================================
+    startFarm: function() {
+        if (this.settings.active) return;
+        this.settings.active = true;
+        this.saveSettings();
+        this.lastTime = Date.now();
+        this.startInterval();
+        ConsoleLog.Log('🌾 AutoFarm iniciado!', 1);
+        this.updateButtonUI(true);
+    },
 
-    main = async () => {
-        if (window.__multbot_captcha_active) return;
-        try {
-            const next_collection = this.getNextCollection();
-            if (next_collection && (this.timer > next_collection + 60 * 1_000 || this.timer < next_collection)) {
-                this.timer = next_collection + Math.floor(Math.random() * 20_000) + 10_000;
+    // ========================================
+    // STOP FARM
+    // ========================================
+    stopFarm: function() {
+        if (!this.settings.active) return;
+        this.settings.active = false;
+        this.saveSettings();
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+        ConsoleLog.Log('⏹️ AutoFarm parado', 1);
+        this.updateButtonUI(false);
+    },
+
+    // ========================================
+    // TOGGLE
+    // ========================================
+    toggle: function() {
+        if (this.settings.active) {
+            this.stopFarm();
+        } else {
+            this.startFarm();
+        }
+    },
+
+    // ========================================
+    // UPDATE BUTTON UI
+    // ========================================
+    updateButtonUI: function(running) {
+        if (this.farmButton) {
+            if (running) {
+                this.farmButton.text('🔄 Iniciado...');
+                this.farmButton.addClass('running');
+                this.farmButton.removeClass('stopped');
+            } else {
+                this.farmButton.text('▶️ Iniciar Farm');
+                this.farmButton.removeClass('running');
+                this.farmButton.addClass('stopped');
             }
-
-            if (this.timer < 1) {
-                this.polis_list = this.generateList();
-                clearInterval(this.active);
-                this.active = null;
-
-                await this.claim();
-                this.active = setInterval(this.main, 5000);
-
-                const rand = Math.floor(Math.random() * 20_000) + 10_000;
-                this.timer = this.timing + rand;
-                if (this.timer < next_collection) this.timer = next_collection + rand;
+        }
+        var status = document.getElementById('farm-status');
+        if (status) {
+            if (running) {
+                status.textContent = '🟢 Executando';
+                status.style.color = '#44ff88';
+            } else {
+                status.textContent = '⏸️ Parado';
+                status.style.color = '#ff6b6b';
             }
-
-            this.updateTimer();
-        } catch (e) {
-            this.console.log('[AutoFarm] Erro no main(): ' + (e?.message ?? e));
-            if (!this.active) this.active = setInterval(this.main, 5000);
         }
-    };
+    },
 
-    /* Claim resources from a single polis */
-    claimSingle = async (town_id, farm_town_id, relation_id, option = 1) => {
-        const data = {
-            model_url: `FarmTownPlayerRelation/${relation_id}`,
-            action_name: 'claim',
-            arguments: {
-                farm_town_id: farm_town_id,
-                type: 'resources',
-                option: option,
-            },
-            town_id: town_id,
-        };
-        try {
-            await this.ajaxPostWithTimeout('frontend_bridge', 'execute', data);
-        } catch (e) {
-            this.console.log('[AutoFarm] Erro ao coletar rural: ' + (e?.message ?? e));
-        }
-    };
+    // ========================================
+    // CONTENT SETTINGS - Aba Farm
+    // ========================================
+    contentSettings: function() {
+        var self = this;
 
-    /* Claim resources from multiple polis */
-    claimMultiple = async (base = 300, boost = 600) => {
-        const polis_list = this.generateList();
-        const data = {
-            towns: polis_list,
-            time_option_base: base,
-            time_option_booty: boost,
-            claim_factor: 'normal',
-            town_id: uw.ITowns.getCurrentTown().id,
-            nl_init: true,
-        };
-        try {
-            await this.ajaxPostWithTimeout('farm_town_overviews', 'claim_loads_multiple', data, 45000);
-        } catch (e) {
-            this.console.log('[AutoFarm] Erro em claimMultiple: ' + (e?.message ?? e));
-            throw e;
-        }
-    };
-
-    /* Pretend that the window it's opening */
-    fakeOpening = async () => {
-        try {
-            const town_id = uw.ITowns.getCurrentTown().id;
-            await this.ajaxGetWithTimeout('farm_town_overviews', 'index', { 
-                town_id: town_id, 
-                nl_init: true 
-            });
-            await this.sleep(10);
-            await this.fakeUpdate();
-        } catch (e) {
-            this.console.log('[AutoFarm] Erro em fakeOpening: ' + (e?.message ?? e));
-            throw e;
-        }
-    };
-
-    /* Fake the user selecting the list */
-    fakeSelectAll = async () => {
-        const data = {
-            town_ids: this.polis_list,
-            town_id: uw.ITowns.getCurrentTown().id,
-            nl_init: true,
-        };
-        try {
-            await this.ajaxGetWithTimeout('farm_town_overviews', 'get_farm_towns_from_multiple_towns', data);
-        } catch (e) {
-            this.console.log('[AutoFarm] Erro em fakeSelectAll: ' + (e?.message ?? e));
-            throw e;
-        }
-    };
-
-    /* Fake the window update*/
-    fakeUpdate = async () => {
-        const town = uw.ITowns.getCurrentTown();
-        const { attributes: booty } = town.getResearches();
-        const { attributes: trade_office } = town.getBuildings();
-        const data = {
-            island_x: town.getIslandCoordinateX(),
-            island_y: town.getIslandCoordinateY(),
-            current_town_id: town.id,
-            booty_researched: booty ? 1 : 0,
-            diplomacy_researched: '',
-            trade_office: trade_office ? 1 : 0,
-            town_id: town.id,
-            nl_init: true,
-        };
-        try {
-            await this.ajaxGetWithTimeout('farm_town_overviews', 'get_farm_towns_for_town', data);
-        } catch (e) {
-            this.console.log('[AutoFarm] Erro em fakeUpdate: ' + (e?.message ?? e));
-            throw e;
-        }
-    };
-
-    /* Fake the gui update */
-    fakeGuiUpdate = () =>
-        new Promise(async (myResolve, myReject) => {
-            // Open the farm town overview
-            uw.$(".toolbar_button.premium .icon").trigger('mouseenter')
-            await this.sleep(1019.39, 127.54)
-
-            // Click on the farm town overview
-            uw.$(".farm_town_overview a").trigger('click')
-            await this.sleep(1156.65, 165.62)
-
-            // Select all the polis
-            uw.$(".checkbox.select_all").trigger("click")
-            await this.sleep(1036.20, 135.69)
-
-            // Claim the resources
-            uw.$("#fto_claim_button").trigger("click")
-            await this.sleep(1036.20, 135.69)
-
-            // Confirm the claim if needed
-            const el = uw.$(".confirmation .btn_confirm.button_new")
-            if (el.length) {
-                el.trigger("click")
-                await this.sleep(1036.20, 135.69)
-            }
-
-            // Close the window
-            uw.$(".icon_right.icon_type_speed.ui-dialog-titlebar-close").trigger("click")
-            myResolve();
+        var fieldset = $('<fieldset/>', {
+            id: 'Autofarm_settings',
+            style: 'float:left; width:100%;'
         });
-}
+
+        fieldset.append($('<legend/>').html('🌾 AutoFarm (ModernBot)'));
+
+        // Status
+        var statusDiv = $('<div/>', {
+            style: 'padding:10px 0;color:#c8a86e;font-size:13px;clear:both;'
+        }).html('📌 Estado: <span id="farm-status" style="color:' + (this.settings.active ? '#44ff88' : '#ff6b6b') + ';">' + (this.settings.active ? '🟢 Executando' : '⏸️ Parado') + '</span>');
+        fieldset.append(statusDiv);
+
+        // Botão Iniciar/Parar
+        var startBtn = FormBuilder.button({
+            name: this.settings.active ? '🔄 Iniciado...' : '▶️ Iniciar Farm',
+            style: 'top:10px;'
+        });
+        this.farmButton = startBtn;
+
+        startBtn.on('click', function(e) {
+            e.preventDefault();
+            self.toggle();
+        });
+
+        fieldset.append(startBtn);
+
+        // Intervalo
+        fieldset.append($('<div/>', { style: 'padding:8px 0;' }).html('<span style="color:#d4a017;font-weight:bold;">⏱️ Intervalo:</span>'));
+
+        var timeGroup = $('<div/>', { style: 'display:flex; gap:6px; padding:5px 0; flex-wrap:wrap;' });
+
+        var btn5 = FormBuilder.button({ name: '5 min', style: 'padding:3px 12px;font-size:11px;' + (this.settings.timing === 300000 ? 'background:#4a7a3a;border-color:#6a9a5a;color:#fff;' : '') });
+        btn5.on('click', function(e) {
+            e.preventDefault();
+            self.settings.timing = 300000;
+            self.saveSettings();
+            self.updateButtonsUI();
+            ConsoleLog.Log('⏱️ Intervalo: 5 minutos', 1);
+        });
+        timeGroup.append(btn5);
+
+        var btn10 = FormBuilder.button({ name: '10 min', style: 'padding:3px 12px;font-size:11px;' + (this.settings.timing === 600000 ? 'background:#4a7a3a;border-color:#6a9a5a;color:#fff;' : '') });
+        btn10.on('click', function(e) {
+            e.preventDefault();
+            self.settings.timing = 600000;
+            self.saveSettings();
+            self.updateButtonsUI();
+            ConsoleLog.Log('⏱️ Intervalo: 10 minutos', 1);
+        });
+        timeGroup.append(btn10);
+
+        var btn20 = FormBuilder.button({ name: '20 min', style: 'padding:3px 12px;font-size:11px;' + (this.settings.timing === 1200000 ? 'background:#4a7a3a;border-color:#6a9a5a;color:#fff;' : '') });
+        btn20.on('click', function(e) {
+            e.preventDefault();
+            self.settings.timing = 1200000;
+            self.saveSettings();
+            self.updateButtonsUI();
+            ConsoleLog.Log('⏱️ Intervalo: 20 minutos', 1);
+        });
+        timeGroup.append(btn20);
+
+        fieldset.append(timeGroup);
+
+        // Armazenamento
+        fieldset.append($('<div/>', { style: 'padding:8px 0;' }).html('<span style="color:#d4a017;font-weight:bold;">📊 Armazenamento:</span>'));
+
+        var percentGroup = $('<div/>', { style: 'display:flex; gap:6px; padding:5px 0; flex-wrap:wrap;' });
+
+        var btn80 = FormBuilder.button({ name: '80%', style: 'padding:3px 12px;font-size:11px;' + (this.settings.percent === 0.8 ? 'background:#4a7a3a;border-color:#6a9a5a;color:#fff;' : '') });
+        btn80.on('click', function(e) {
+            e.preventDefault();
+            self.settings.percent = 0.8;
+            self.saveSettings();
+            self.updateButtonsUI();
+            ConsoleLog.Log('📊 Armazenamento: 80%', 1);
+        });
+        percentGroup.append(btn80);
+
+        var btn90 = FormBuilder.button({ name: '90%', style: 'padding:3px 12px;font-size:11px;' + (this.settings.percent === 0.9 ? 'background:#4a7a3a;border-color:#6a9a5a;color:#fff;' : '') });
+        btn90.on('click', function(e) {
+            e.preventDefault();
+            self.settings.percent = 0.9;
+            self.saveSettings();
+            self.updateButtonsUI();
+            ConsoleLog.Log('📊 Armazenamento: 90%', 1);
+        });
+        percentGroup.append(btn90);
+
+        var btn100 = FormBuilder.button({ name: '100%', style: 'padding:3px 12px;font-size:11px;' + (this.settings.percent === 1 ? 'background:#4a7a3a;border-color:#6a9a5a;color:#fff;' : '') });
+        btn100.on('click', function(e) {
+            e.preventDefault();
+            self.settings.percent = 1;
+            self.saveSettings();
+            self.updateButtonsUI();
+            ConsoleLog.Log('📊 Armazenamento: 100%', 1);
+        });
+        percentGroup.append(btn100);
+
+        fieldset.append(percentGroup);
+
+        // Modo GUI
+        fieldset.append($('<div/>', { style: 'padding:8px 0;' }).html('<span style="color:#d4a017;font-weight:bold;">🖥️ Modo GUI:</span>'));
+
+        var guiGroup = $('<div/>', { style: 'display:flex; gap:6px; padding:5px 0; flex-wrap:wrap;' });
+
+        var btnGuiOn = FormBuilder.button({ name: 'ON', style: 'padding:3px 12px;font-size:11px;' + (this.settings.gui ? 'background:#4a7a3a;border-color:#6a9a5a;color:#fff;' : '') });
+        btnGuiOn.on('click', function(e) {
+            e.preventDefault();
+            self.settings.gui = true;
+            self.saveSettings();
+            self.updateButtonsUI();
+            ConsoleLog.Log('🖥️ Modo GUI: ON', 1);
+        });
+        guiGroup.append(btnGuiOn);
+
+        var btnGuiOff = FormBuilder.button({ name: 'OFF', style: 'padding:3px 12px;font-size:11px;' + (!this.settings.gui ? 'background:#4a7a3a;border-color:#6a9a5a;color:#fff;' : '') });
+        btnGuiOff.on('click', function(e) {
+            e.preventDefault();
+            self.settings.gui = false;
+            self.saveSettings();
+            self.updateButtonsUI();
+            ConsoleLog.Log('🖥️ Modo GUI: OFF', 1);
+        });
+        guiGroup.append(btnGuiOff);
+
+        fieldset.append(guiGroup);
+
+        // Informações adicionais
+        fieldset.append($('<div/>', {
+            style: 'padding:10px 0;color:#a89070;font-size:11px;border-top:1px solid #2a1f0e;margin-top:8px;'
+        }).html('⚡ Premium Captain necessário para farm rápido<br>📌 1 cidade por ilha | Coleta automática'));
+
+        // Atualiza os botões
+        this.updateButtonsUI();
+
+        // Atualiza o timer a cada segundo
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+        }
+        this._timerInterval = setInterval(function() {
+            if (self.settings.active) {
+                self.updateTimer();
+            }
+        }, 1000);
+
+        return fieldset;
+    },
+
+    // ========================================
+    // UPDATE BUTTONS UI
+    // ========================================
+    updateButtonsUI: function() {
+        var self = this;
+        // Atualiza o estado do botão principal
+        if (this.farmButton) {
+            if (this.settings.active) {
+                this.farmButton.text('🔄 Iniciado...');
+                this.farmButton.addClass('running');
+                this.farmButton.removeClass('stopped');
+            } else {
+                this.farmButton.text('▶️ Iniciar Farm');
+                this.farmButton.removeClass('running');
+                this.farmButton.addClass('stopped');
+            }
+        }
+
+        // Atualiza os botões de intervalo
+        $('#Autofarm_settings .button_new').each(function() {
+            var text = $(this).text().trim();
+            if (text === '5 min' || text === '10 min' || text === '20 min') {
+                $(this).css('background', '');
+                $(this).css('border-color', '');
+                $(this).css('color', '');
+            }
+            if (text === '80%' || text === '90%' || text === '100%') {
+                $(this).css('background', '');
+                $(this).css('border-color', '');
+                $(this).css('color', '');
+            }
+            if (text === 'ON' || text === 'OFF') {
+                $(this).css('background', '');
+                $(this).css('border-color', '');
+                $(this).css('color', '');
+            }
+        });
+
+        // Marca os ativos
+        $('#Autofarm_settings .button_new').each(function() {
+            var text = $(this).text().trim();
+            if ((text === '5 min' && self.settings.timing === 300000) ||
+                (text === '10 min' && self.settings.timing === 600000) ||
+                (text === '20 min' && self.settings.timing === 1200000)) {
+                $(this).css('background', 'linear-gradient(135deg,#2d5a1e,#3d7a2e)');
+                $(this).css('border-color', '#44ff88');
+                $(this).css('color', '#44ff88');
+            }
+            if ((text === '80%' && self.settings.percent === 0.8) ||
+                (text === '90%' && self.settings.percent === 0.9) ||
+                (text === '100%' && self.settings.percent === 1)) {
+                $(this).css('background', 'linear-gradient(135deg,#2d5a1e,#3d7a2e)');
+                $(this).css('border-color', '#44ff88');
+                $(this).css('color', '#44ff88');
+            }
+            if ((text === 'ON' && self.settings.gui) ||
+                (text === 'OFF' && !self.settings.gui)) {
+                $(this).css('background', 'linear-gradient(135deg,#2d5a1e,#3d7a2e)');
+                $(this).css('border-color', '#44ff88');
+                $(this).css('color', '#44ff88');
+            }
+        });
+
+        var status = document.getElementById('farm-status');
+        if (status) {
+            if (self.settings.active) {
+                status.textContent = '🟢 Executando';
+                status.style.color = '#44ff88';
+            } else {
+                status.textContent = '⏸️ Parado';
+                status.style.color = '#ff6b6b';
+            }
+        }
+    }
+};

@@ -19,10 +19,14 @@ if (typeof GM_addStyle === 'undefined') {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 🎨 CSS DO AUTOATTACK - TEMA CASTANHO
+// 🎨 CSS DO AUTOATTACK - TEMA CASTANHO (IGUAL AO SCRIPT ORIGINAL)
 // ═══════════════════════════════════════════════════════════════════════
 
 GM_addStyle(`
+    /* ============================================
+       AUTOATTACK - TEMA CASTANHO (ORIGINAL)
+       ============================================ */
+
     .attack-btn {
         display: inline-block !important;
         padding: 6px 14px !important;
@@ -37,6 +41,7 @@ GM_addStyle(`
         text-decoration: none !important;
         margin: 2px !important;
     }
+
     .attack-btn:hover {
         background: linear-gradient(135deg, #4a3520, #3a2510) !important;
         border-color: #d4a017 !important;
@@ -44,25 +49,30 @@ GM_addStyle(`
         box-shadow: 0 0 20px rgba(139, 105, 20, 0.2) !important;
         transform: translateY(-1px) !important;
     }
+
     .attack-btn.running {
         background: linear-gradient(135deg, #2d5a1e, #1a3a0a) !important;
         border-color: #44ff88 !important;
         color: #44ff88 !important;
     }
+
     .attack-btn.stopped {
         background: linear-gradient(135deg, #5a1e1e, #3a0a0a) !important;
         border-color: #ff4444 !important;
         color: #ff4444 !important;
     }
+
     .attack-btn.disabled {
         opacity: 0.5 !important;
         cursor: not-allowed !important;
         filter: grayscale(50%) !important;
     }
+
     .attack-btn.disabled:hover {
         transform: none !important;
         box-shadow: none !important;
     }
+
     .attacks_list {
         list-style: none !important;
         padding: 0 !important;
@@ -70,6 +80,7 @@ GM_addStyle(`
         max-height: 280px !important;
         overflow-y: auto !important;
     }
+
     .attacks_list li {
         padding: 6px 8px !important;
         border-bottom: 1px solid #2a1a0a !important;
@@ -80,9 +91,20 @@ GM_addStyle(`
         margin: 2px 0 !important;
         min-height: 32px !important;
     }
-    .attacks_list li.odd { background: rgba(30, 20, 10, 0.2) !important; }
-    .attacks_list li.even { background: rgba(50, 35, 20, 0.15) !important; }
-    .attacks_list li:hover { background: rgba(139, 105, 20, 0.15) !important; border-color: #8B6914 !important; }
+
+    .attacks_list li.odd {
+        background: rgba(30, 20, 10, 0.2) !important;
+    }
+
+    .attacks_list li.even {
+        background: rgba(50, 35, 20, 0.15) !important;
+    }
+
+    .attacks_list li:hover {
+        background: rgba(139, 105, 20, 0.15) !important;
+        border-color: #8B6914 !important;
+    }
+
     .attacks_list .attack_type32x32 {
         display: inline-block !important;
         width: 32px !important;
@@ -93,6 +115,7 @@ GM_addStyle(`
         margin-right: 8px !important;
         background-size: 500px 150px !important;
     }
+
     .attacks_list .arrow {
         display: inline-block !important;
         width: 16px !important;
@@ -102,9 +125,25 @@ GM_addStyle(`
         vertical-align: middle !important;
         margin: 0 4px !important;
     }
-    .attacks_list .row1 { font-weight: bold !important; color: #d4a017 !important; display: inline-block !important; font-size: 11px !important; }
-    .attacks_list .row2 { font-size: 10px !important; color: #a89070 !important; display: block !important; margin-top: 2px !important; }
-    .attacks_list .row2.expired { color: #ff4444 !important; }
+
+    .attacks_list .row1 {
+        font-weight: bold !important;
+        color: #d4a017 !important;
+        display: inline-block !important;
+        font-size: 11px !important;
+    }
+
+    .attacks_list .row2 {
+        font-size: 10px !important;
+        color: #a89070 !important;
+        display: block !important;
+        margin-top: 2px !important;
+    }
+
+    .attacks_list .row2.expired {
+        color: #ff4444 !important;
+    }
+
     .attacks_list .attack_bot_timer {
         position: absolute !important;
         right: 10px !important;
@@ -116,8 +155,15 @@ GM_addStyle(`
         font-family: 'Consolas', monospace !important;
         text-shadow: 0 0 10px rgba(68, 255, 136, 0.2) !important;
     }
-    .attacks_list .attack_bot_timer.success { color: #44ff88 !important; }
-    .attacks_list .attack_bot_timer.error { color: #ff4444 !important; }
+
+    .attacks_list .attack_bot_timer.success {
+        color: #44ff88 !important;
+    }
+
+    .attacks_list .attack_bot_timer.error {
+        color: #ff4444 !important;
+    }
+
     .attacks_list .show_units {
         cursor: pointer !important;
         color: #8B6914 !important;
@@ -126,7 +172,11 @@ GM_addStyle(`
         margin-left: 4px !important;
         transition: color 0.2s ease !important;
     }
-    .attacks_list .show_units:hover { color: #d4a017 !important; }
+
+    .attacks_list .show_units:hover {
+        color: #d4a017 !important;
+    }
+
     .origin_town_units {
         display: none !important;
         padding: 5px 0 !important;
@@ -134,6 +184,7 @@ GM_addStyle(`
         margin-top: 5px !important;
         clear: both !important;
     }
+
     .origin_town_units .unit_icon25x25 {
         display: inline-block !important;
         width: 25px !important;
@@ -149,6 +200,7 @@ GM_addStyle(`
         text-shadow: 0 0 10px rgba(255, 215, 0, 0.2) !important;
         background-size: 500px 150px !important;
     }
+
     .attack-status {
         padding: 8px 0 !important;
         color: #a89070 !important;
@@ -160,6 +212,7 @@ GM_addStyle(`
         justify-content: space-between !important;
         align-items: center !important;
     }
+
     .attack-status .status-dot {
         display: inline-block !important;
         width: 10px !important;
@@ -167,18 +220,45 @@ GM_addStyle(`
         border-radius: 50% !important;
         margin-right: 8px !important;
     }
-    .attack-status .status-dot.idle { background: #666 !important; }
-    .attack-status .status-dot.running { background: #44ff88 !important; animation: pulse-dot 1s ease-in-out infinite !important; }
-    .attack-status .status-dot.done { background: #ffd700 !important; }
-    .attack-status .status-dot.error { background: #ff4444 !important; }
+
+    .attack-status .status-dot.idle {
+        background: #666 !important;
+    }
+
+    .attack-status .status-dot.running {
+        background: #44ff88 !important;
+        animation: pulse-dot 1s ease-in-out infinite !important;
+    }
+
+    .attack-status .status-dot.done {
+        background: #ffd700 !important;
+    }
+
+    .attack-status .status-dot.error {
+        background: #ff4444 !important;
+    }
+
     @keyframes pulse-dot {
         0%, 100% { opacity: 1; transform: scale(1); }
         50% { opacity: 0.5; transform: scale(0.8); }
     }
-    .attacks_list::-webkit-scrollbar { width: 4px !important; }
-    .attacks_list::-webkit-scrollbar-track { background: #1a1008 !important; }
-    .attacks_list::-webkit-scrollbar-thumb { background: #8B6914 !important; border-radius: 2px !important; }
-    .attacks_list::-webkit-scrollbar-thumb:hover { background: #d4a017 !important; }
+
+    .attacks_list::-webkit-scrollbar {
+        width: 4px !important;
+    }
+
+    .attacks_list::-webkit-scrollbar-track {
+        background: #1a1008 !important;
+    }
+
+    .attacks_list::-webkit-scrollbar-thumb {
+        background: #8B6914 !important;
+        border-radius: 2px !important;
+    }
+
+    .attacks_list::-webkit-scrollbar-thumb:hover {
+        background: #d4a017 !important;
+    }
 `);
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -236,11 +316,13 @@ var DataExchangerAA = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// 📦 MÓDULO: AutoAttack
+// 📦 MÓDULO: AutoAttack (IGUAL AO SCRIPT ORIGINAL)
 // ═══════════════════════════════════════════════════════════════════════
 
 var AutoAttackModule = {
-    settings: { autostart: false },
+    settings: {
+        autostart: false
+    },
     attacks: [],
     attacks_timers: [],
     checked_count: 0,
@@ -610,10 +692,15 @@ var AutoAttackModule = {
         HumanMessage.info('AutoAttack parado!');
     },
 
+    // ═══════════════════════════════════════════════════════════════════
+    //  SETTINGS DA ABA "PLANO" - IGUAL AO SCRIPT ORIGINAL
+    // ═══════════════════════════════════════════════════════════════════
+
     settings: function() {
         var self = this;
         var isCaptain = this.checkPremium();
 
+        // Carrega ataques após renderizar
         setTimeout(function() {
             self.loadAttackQueue();
         }, 500);
@@ -655,7 +742,7 @@ var AutoAttackModule = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// 📦 MULTBOT - CORRIGIDO (SEM DROPDOWN DO AUTOFARM)
+// 📦 MULTBOT - COM NOVA ABA "PLANO"
 // ═══════════════════════════════════════════════════════════════════════
 
 var MultBot = class {
@@ -665,18 +752,14 @@ var MultBot = class {
 
         this.$ui = uw.$("#ui_box");
         this.$menu = this.createMultMenu();
+        const $divider = uw.$('<div class="divider"></div>');
 
-        // ⭐ AUTO FARM - Carregado do módulo externo (SEM dropdown)
-        if (typeof AutoFarm !== 'undefined') {
-            this.autoFarm = new AutoFarm(this.console, this.storage);
-            // ⭐ REMOVIDO: $menu.append e $ui.append (dropdown removido)
-            console.log('[MultBot] ✅ AutoFarm carregado do módulo externo (sem dropdown)');
-        } else {
-            this.autoFarm = null;
-            console.log('[MultBot] ⚠️ AutoFarm não disponível');
+        this.autoFarm = this._safeInit('AutoFarm', () => new AutoFarm(this.console, this.storage));
+        if (this.autoFarm) {
+            this.$menu.append(this.autoFarm.$activity);
+            this.$ui.append(this.autoFarm.$popup);
         }
 
-        // ⭐ RESTANTES MÓDULOS
         this.autoGratis         = this._safeInit('AutoGratis', () => new AutoGratis(this.console, this.storage));
         this.autoRuralLevel     = this._safeInit('AutoRuralLevel', () => new AutoRuralLevel(this.console, this.storage));
         this.autoBuild          = this._safeInit('AutoBuild', () => new AutoBuild(this.console, this.storage));
@@ -696,7 +779,7 @@ var MultBot = class {
         this.autoResearch       = this._safeInit('AutoResearch', () => new AutoResearch(this.console, this.storage));
         this.statusPanel        = this._safeInit('StatusPanel', () => new StatusPanel(this.console, this.storage));
 
-        // ⭐ AUTOATTACK
+        // ⭐ AUTOATTACK - Módulo igual ao script original
         this.autoAttackModule = AutoAttackModule;
         this.autoAttackModule.init();
 
@@ -901,7 +984,7 @@ var MultBot = class {
                     render: this.settingsStatus,
                 },
                 {
-                    title: '🌾 Farm',
+                    title: multT('tab_farm'),
                     id: 'farm',
                     render: this.settingsFarm,
                 },
@@ -971,6 +1054,7 @@ var MultBot = class {
     _setupPlanoEvents() {
         var self = this;
         
+        // Usa MutationObserver para detectar quando a aba Plano é aberta
         var observer = new MutationObserver(function() {
             var activateBtn = document.getElementById('attack-activate-btn');
             var refreshBtn = document.getElementById('attack-refresh-btn');
@@ -1031,21 +1115,10 @@ var MultBot = class {
         return this.statusPanel ? this.statusPanel.settings() : this._missingModuleHtml('Status');
     };
 
-    // ⭐ ABA FARM - COM AUTO FARM (SEM DROPDOWN)
     settingsFarm = () => {
-        var html = '';
-        if (this.autoFarm) {
-            html += '<div id="af-settings-container">';
-            html += this.autoFarm.settings();
-            html += '</div>';
-            setTimeout(function() {
-                if (window.multBot && window.multBot.autoFarm) {
-                    window.multBot.autoFarm.bindSettingsEvents();
-                }
-            }, 100);
-        } else {
-            html += this._missingModuleHtml('Auto Farm');
-        }
+        let html = '';
+        html += this.autoRuralLevel ? this.autoRuralLevel.settings() : this._missingModuleHtml('Auto Rural Level');
+        html += this.autoRuralTrade ? this.autoRuralTrade.settings() : this._missingModuleHtml('Auto Rural Trade');
         return html;
     };
 

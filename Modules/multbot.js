@@ -655,7 +655,7 @@ var AutoAttackModule = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// 📦 MULTBOT - CORRIGIDO (AutoFarm carregado do módulo externo)
+// 📦 MULTBOT - CORRIGIDO (SEM DROPDOWN DO AUTOFARM)
 // ═══════════════════════════════════════════════════════════════════════
 
 var MultBot = class {
@@ -665,22 +665,18 @@ var MultBot = class {
 
         this.$ui = uw.$("#ui_box");
         this.$menu = this.createMultMenu();
-        const $divider = uw.$('<div class="divider"></div>');
 
-        // ⭐ AUTO FARM - Carregado do módulo externo (NÃO usar _safeInit)
+        // ⭐ AUTO FARM - Carregado do módulo externo (SEM dropdown)
         if (typeof AutoFarm !== 'undefined') {
             this.autoFarm = new AutoFarm(this.console, this.storage);
-            if (this.autoFarm) {
-                this.$menu.append(this.autoFarm.$activity);
-                this.$ui.append(this.autoFarm.$popup);
-            }
-            console.log('[MultBot] ✅ AutoFarm carregado do módulo externo');
+            // ⭐ REMOVIDO: $menu.append e $ui.append (dropdown removido)
+            console.log('[MultBot] ✅ AutoFarm carregado do módulo externo (sem dropdown)');
         } else {
             this.autoFarm = null;
             console.log('[MultBot] ⚠️ AutoFarm não disponível');
         }
 
-        // ⭐ RESTANTES MÓDULOS (que NÃO estão no auto_farm.js)
+        // ⭐ RESTANTES MÓDULOS
         this.autoGratis         = this._safeInit('AutoGratis', () => new AutoGratis(this.console, this.storage));
         this.autoRuralLevel     = this._safeInit('AutoRuralLevel', () => new AutoRuralLevel(this.console, this.storage));
         this.autoBuild          = this._safeInit('AutoBuild', () => new AutoBuild(this.console, this.storage));
@@ -1035,7 +1031,7 @@ var MultBot = class {
         return this.statusPanel ? this.statusPanel.settings() : this._missingModuleHtml('Status');
     };
 
-    // ⭐ ABA FARM - COM AUTO FARM
+    // ⭐ ABA FARM - COM AUTO FARM (SEM DROPDOWN)
     settingsFarm = () => {
         var html = '';
         if (this.autoFarm) {

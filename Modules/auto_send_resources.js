@@ -2,10 +2,9 @@
 // 📦 MÓDULO: AutoSendResources (VERSÃO COMPLETA COM UI)
 // ═══════════════════════════════════════════════════════════════════════
 
-var AutoSendResources = class {
+var AutoSendResources = class extends MultUtil {
     constructor(console, storage) {
-        this.console = console;
-        this.storage = storage;
+        super(console, storage);
         this._active = false;
         this._intervalId = null;
         this._isSending = false;

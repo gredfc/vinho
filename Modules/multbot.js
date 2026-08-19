@@ -774,7 +774,7 @@ var MultBot = class {
         this.multTools          = this._safeInit('MultTools', () => new MultTools(this.console, this.storage));
         this.autoQuest          = this._safeInit('AutoQuest', () => new AutoQuest(this.console, this.storage));
         this.autoMilitia        = this._safeInit('AutoMilitia', () => new AutoMilitia(this.console, this.storage));
-        this.autoAttack         = this._safeInit('AutoDodge', () => new AutoDodge(this.console, this.storage));
+        this.autoAttack         = this._safeInit('AutoAttack', () => new AutoAttack(this.console, this.storage));
         this.autoAresSacrifice  = this._safeInit('AutoAresSacrifice', () => new AutoAresSacrifice(this.console, this.storage));
         this.autoResearch       = this._safeInit('AutoResearch', () => new AutoResearch(this.console, this.storage));
         this.statusPanel        = this._safeInit('StatusPanel', () => new StatusPanel(this.console, this.storage));

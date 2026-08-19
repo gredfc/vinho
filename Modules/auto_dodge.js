@@ -20,9 +20,9 @@
 //  5) this.getTownName (MultUtil) em vez de _getTownName local.
 // ══════════════════════════════════════════════════════
 var AutoDodge = class extends MultUtil {
-    EVACUATE_LEAD_SECONDS = 5;
-    RECALL_BUFFER_SECONDS = 5;
-    CAPTURE_DELAY_MS = 1500;
+    EVACUATE_LEAD_SECONDS = 12;
+    RECALL_BUFFER_SECONDS = -2;
+    CAPTURE_DELAY_MS = 500;
     ISLAND_SCRAPE_DELAY_MS =200;
 
     constructor(c, s) {

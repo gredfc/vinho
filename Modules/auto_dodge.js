@@ -20,7 +20,7 @@
 //  5) this.getTownName (MultUtil) em vez de _getTownName local.
 // ══════════════════════════════════════════════════════
 var AutoDodge = class extends MultUtil {
-    EVACUATE_LEAD_SECONDS = 12;
+    EVACUATE_LEAD_SECONDS = 5;
     RECALL_BUFFER_SECONDS = -2;
     CAPTURE_DELAY_MS = 500;
     ISLAND_SCRAPE_DELAY_MS =200;
@@ -631,7 +631,7 @@ var AutoDodge = class extends MultUtil {
 
         this.console.log('[AutoDodge] ' + this.t('ad_recall_calling_log', { town: townName, label, id: commandId }));
 
-        this.ajaxPostWithTimeout('command_info', 'cancel_command', data, 15000)
+        this.ajaxPostWithTimeout('command_info', 'cancel_command', data, 5000)
             .then((res) => {
                 this.console.log('[AutoDodge] ' + this.t('ad_recall_response_log', { label, res: JSON.stringify(res) }));
                 if (res && !res.error) {
@@ -657,7 +657,7 @@ var AutoDodge = class extends MultUtil {
                 { id: parseInt(toTownId, 10), type: 'support' },
                 units
             );
-            return this.ajaxPostWithTimeout('town_info', 'send_units', data, 15000);
+            return this.ajaxPostWithTimeout('town_info', 'send_units', data, 5000);
         });
     }
 
